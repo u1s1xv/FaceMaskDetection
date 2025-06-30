@@ -71,7 +71,10 @@ def initialize_project():
         if not d.exists():
             try:
                 d.mkdir(parents=True, exist_ok=True)
-                logger.info(f" 已经创建的目录：{d.relative_to(YOLOSERVER_ROOT)}")
+                # 创建 .keep 文件用于 git 版本控制
+                keep_file = d / ".keep"
+                keep_file.touch()
+                logger.info(f" 已经创建的目录：{d.relative_to(YOLOSERVER_ROOT)} (包含 .keep 文件)")
                 created_dirs.append(d)
             except Exception as e:
                 logger.error(f" 创建目录：{d.relative_to(YOLOSERVER_ROOT)} 失败: {e}")
@@ -79,6 +82,14 @@ def initialize_project():
         else:
             logger.info(f" 检测到已存在的目录：{d.relative_to(YOLOSERVER_ROOT)}")
             existing_dirs.append(d.relative_to(YOLOSERVER_ROOT))
+            # 为已存在的目录检查并创建 .keep 文件（如果不存在）
+            keep_file = d / ".keep"
+            if not keep_file.exists():
+                try:
+                    keep_file.touch()
+                    logger.info(f" 为已存在目录添加 .keep 文件：{d.relative_to(YOLOSERVER_ROOT)}")
+                except Exception as e:
+                    logger.warning(f" 为目录 {d.relative_to(YOLOSERVER_ROOT)} 创建 .keep 文件失败: {e}")
     logger.info(f"核心项目文件夹结构检查以及创建完成".center(60, "="))
 
     # 3. 检查原始数据集目录并给出提示
@@ -89,15 +100,33 @@ def initialize_project():
     }
     for desc, raw_dir in raw_dirs_to_check.items():
         if not raw_dir.exists():
-            msg = (
-                f"!! 原始{desc}目录不存在，请将原始数据集数据放置此目录下，"
-                f"并确保目录结构正确，以便后续数据集转换正常执行"
-            )
-            logger.warning(msg)
-            logger.warning(f"期望结构为: {raw_dir.resolve()}")
-            raw_data_status.append(f"{raw_dir.relative_to(YOLOSERVER_ROOT)}:不存在，需要手动创建并放置原始数据")
+            try:
+                # 创建原始数据目录
+                raw_dir.mkdir(parents=True, exist_ok=True)
+                # 创建 .keep 文件用于 git 版本控制
+                keep_file = raw_dir / ".keep"
+                keep_file.touch()
+                logger.info(f"已创建原始{desc}目录：{raw_dir.relative_to(YOLOSERVER_ROOT)} (包含 .keep 文件)")
+                msg = (
+                    f"原始{desc}目录已创建，请将原始数据集数据放置此目录下，"
+                    f"并确保目录结构正确，以便后续数据集转换正常执行"
+                )
+                logger.warning(msg)
+                raw_data_status.append(f"{raw_dir.relative_to(YOLOSERVER_ROOT)}:已创建，需要放置原始数据")
+            except Exception as e:
+                logger.error(f"创建原始{desc}目录失败: {e}")
+                raw_data_status.append(f"{raw_dir.relative_to(YOLOSERVER_ROOT)}:创建失败，需要手动创建并放置原始数据")
         else:
-            if not any(raw_dir.iterdir()):
+            # 为已存在的原始数据目录检查并创建 .keep 文件（如果不存在且目录为空）
+            keep_file = raw_dir / ".keep"
+            if not keep_file.exists() and not any(f for f in raw_dir.iterdir() if f.name != ".keep"):
+                try:
+                    keep_file.touch()
+                    logger.info(f"为原始{desc}目录添加 .keep 文件：{raw_dir.relative_to(YOLOSERVER_ROOT)}")
+                except Exception as e:
+                    logger.warning(f"为原始{desc}目录创建 .keep 文件失败: {e}")
+
+            if not any(f for f in raw_dir.iterdir() if f.name != ".keep"):
                 msg = f"原始{desc}，已经存在，但内容为空，请将原始{desc}放在此目录下，以便后续数据集转换"
                 logger.warning(msg)
                 raw_data_status.append(f"{raw_dir.relative_to(YOLOSERVER_ROOT)}:已经存在，但内容为空,需要放置原始数据")
