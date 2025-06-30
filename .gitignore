@@ -13,3 +13,5 @@ yoloserver/data/*
 
 # Logs directories
 yoloserver/logs/*
+!yoloserver/logs/.keep
+!yoloserver/logs/*/.keep
