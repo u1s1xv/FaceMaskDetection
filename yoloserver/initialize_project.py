@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-# @FileName  :initialize_project.py
-# @Time      :2025/6/24 09:09:24
-# @Author    :雨霓同学
+# @FileName  :
+# @Time      :
+# @Author    :
 # @Project   :BTD
 # @Function  :项目初始化脚本，检查并创建必要的项目结构，提示用户将原始数据存放到指定的位置
 
