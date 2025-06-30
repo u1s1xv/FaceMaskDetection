@@ -43,6 +43,15 @@ YOLO_STAGED_LABELS_DIR = RAW_DATA_DIR / "yolo_staged_labels"
 # 临时文件存放目录
 RAW_TEMP_DIR = RAW_DATA_DIR / "temp"
 
+# 爬虫数据文件目录
+CRAWLED_DATA_DIR = DATA_DIR / "crawled"
+
+# 爬虫图像存放目录
+CRAWLED_IMAGES_DIR = CRAWLED_DATA_DIR / "images"
+
+# 爬虫原始标注文件存放目录
+CRAWLED_ORIGINAL_ANNOTATIONS_DIR = CRAWLED_DATA_DIR / "original_annotations"
+
 # 训练验证测试数据集存放目录
 TRAIN_DIR = DATA_DIR / "train"
 VAL_DIR = DATA_DIR / "val"
@@ -69,6 +78,9 @@ if __name__ == "__main__":
         ORIGINAL_ANNOTATIONS_DIR,
         YOLO_STAGED_LABELS_DIR,
         RAW_TEMP_DIR,
+        CRAWLED_DATA_DIR,
+        CRAWLED_IMAGES_DIR,
+        CRAWLED_ORIGINAL_ANNOTATIONS_DIR,
         TRAIN_DIR,
         VAL_DIR,
         TEST_DIR,
