@@ -10,3 +10,4 @@ yoloserver/data/*
 !yoloserver/data/*/.keep
 !yoloserver/data/*/*/.keep
 !yoloserver/data/crawled
+yoloserver/logs/*
