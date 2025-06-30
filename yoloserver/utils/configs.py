@@ -12,15 +12,15 @@ import torch
 DEFAULT_TRAIN_CONFIG = {
     # 基本参数
     'data': 'data.yaml',
-    'epochs': 2,
+    'epochs': 200,
     'time': 'null',  # 明确禁用时间限制
-    'batch': 16,
-    'imgsz': 640,
+    'batch': 16, #8G显存建议8-16，16G可32，建议16起步
+    'imgsz': 640, # 口罩目标较小，640足够，720可选
     'device': "0" if torch.cuda.is_available() else "cpu",
     'workers': 8,
 
     # 训练控制
-    'patience': 100,
+    'patience': 20,
     'save': True,
     'save_period': -1,
     'cache': False,
@@ -39,7 +39,7 @@ DEFAULT_TRAIN_CONFIG = {
     'deterministic': True,
     'single_cls': False,
     'classes': None,  # 明确不筛选特定类
-    'rect': False,
+    'rect': True,  #小目标，改为True
     'cos_lr': False,
     'multi_scale': False,  # 补充参数
 
@@ -47,8 +47,8 @@ DEFAULT_TRAIN_CONFIG = {
     'box': 7.5,
     'cls': 0.5,
     'dfl': 1.5,
-    'pose': 12.0,  # 明确不使用姿态估计
-    'kobj': 1.0,   # 明确不使用关键点
+    'pose':  0.0,  # 明确不使用姿态估计,改为0.0
+    'kobj': 0.0,   # 明确不使用关键点，改为0.0
 
     # 学习率参数
     'lr0': 0.001,
@@ -60,24 +60,24 @@ DEFAULT_TRAIN_CONFIG = {
     'warmup_bias_lr': 0.1,
 
     # 数据增强
-    'hsv_h': 0.015,
+    'hsv_h': 0.05,
     'hsv_s': 0.7,
     'hsv_v': 0.4,
-    'degrees': 0.0,
-    'translate': 0.1,
-    'scale': 0.5,
-    'shear': 0.0,
-    'perspective': 0.0,
-    'flipud': 0.0,
+    'degrees': 10.0,  # 允许±10度旋转
+    'translate': 0.2,
+    'scale': 0.7,
+    'shear': 2.0,
+    'perspective': 0.001,
+    'flipud': 0.1,
     'fliplr': 0.5,
     'bgr': 0.0,  # 补充参数
     'mosaic': 1.0,
-    'mixup': 0.0,
-    'cutmix': 0.0,  # 补充参数
-    'copy_paste': 0.0,
+    'mixup': 0.2,
+    'cutmix': 0.1,  # 补充参数
+    'copy_paste': 0.1,
     'copy_paste_mode': 'flip',  # 补充参数（无效）
     'auto_augment': 'randaugment',  # 补充参数（无效）
-    'erasing': 0.4,
+    'erasing': 0.5,
 
     # 特殊参数
     'close_mosaic': 10,
@@ -101,11 +101,11 @@ COMMENTED_TRAIN_CONFIG = (
     "# --- 核心参数 (优先设置) ---\n"
     "# (*)数据集配置文件路径 (YAML格式，需定义train/val路径和类别)\n"
     f"data: {DEFAULT_TRAIN_CONFIG['data']}\n"
-    "# (*)训练总轮次 (安全帽检测建议50-300轮)\n"
+    "# (*)训练总轮次 (口罩检测建议50-300轮)\n"
     f"epochs: {DEFAULT_TRAIN_CONFIG['epochs']}\n"
     "# (*)批量大小 (GPU显存<8G建议8-16，>8G可32-64)\n"
     f"batch: {DEFAULT_TRAIN_CONFIG['batch']}\n"
-    "# (*)输入图像尺寸 (安全帽小目标建议>=640)\n"
+    "# (*)输入图像尺寸 (口罩小目标建议>=640)\n"
     f"imgsz: {DEFAULT_TRAIN_CONFIG['imgsz']}\n"
     "# (*)训练设备 (自动选择GPU/CPU，多GPU可用'0,1')\n"
     f"device: '{DEFAULT_TRAIN_CONFIG['device']}'\n"
@@ -115,9 +115,9 @@ COMMENTED_TRAIN_CONFIG = (
     "# --- 训练增强与优化 ---\n"
     "# (*)马赛克增强概率 (小目标检测建议0.75-1.0)\n"
     f"mosaic: {DEFAULT_TRAIN_CONFIG['mosaic']}\n"
-    "# (*)水平翻转概率 (安全帽检测推荐0.3-0.7)\n"
+    "# (*)水平翻转概率 (口罩检测推荐0.3-0.7)\n"
     f"fliplr: {DEFAULT_TRAIN_CONFIG['fliplr']}\n"
-    "# 垂直翻转概率 (安全帽建议禁用=0)\n"
+    "# 垂直翻转概率 (口罩建议禁用=0)\n"
     f"flipud: {DEFAULT_TRAIN_CONFIG['flipud']}\n"
     "# (*)学习率预热轮次 (通常3-5轮)\n"
     f"warmup_epochs: {DEFAULT_TRAIN_CONFIG['warmup_epochs']}\n"
@@ -371,7 +371,7 @@ COMMENTED_INFER_CONFIG = (
     "# 参数参考: https://docs.ultralytics.com/zh/modes/predict/#inference-arguments\n"
     "# 可手动修改参数，或通过命令行进行覆盖如 (--conf 0.5)\n"
     "\n"
-    "# --- 常见参数 (工地安全帽检测高频调整) ---\n"
+    "# --- 常见参数 (工地口罩检测高频调整) ---\n"
     "# (*)数据源，指定工地视频/图像路径、URL或摄像头ID\n"
     f"source: {DEFAULT_INFER_CONFIG['source']}\n"
     "# (*)输入图像尺寸，整数或 (高度, 宽度) 元组，工地场景建议 640 或 1280\n"
@@ -386,7 +386,7 @@ COMMENTED_INFER_CONFIG = (
     f"save: {DEFAULT_INFER_CONFIG['save']}\n"
     "# (*)保存检测结果为 txt 文件，格式为 [class] [x_center] [y_center] [width] [height] [confidence]，便于分析，默认 False\n"
     f"save_txt: {DEFAULT_INFER_CONFIG['save_txt']}\n"
-    "# (*)保存裁剪后的安全帽图像，用于存档或复核，默认 False\n"
+    "# (*)保存裁剪后的口罩图像，用于存档或复核，默认 False\n"
     f"save_crop: {DEFAULT_INFER_CONFIG['save_crop']}\n"
     "# (*)实时显示注释图像/视频，适合现场监控或调试，默认 False\n"
     f"show: {DEFAULT_INFER_CONFIG['show']}\n"
