@@ -62,7 +62,7 @@ class YOLODatasetProcessor:
         self.yolo_staged_labels_dir = YOLO_STAGED_LABELS_DIR
         self.output_data_path = DATA_DIR
         self.config_path = CONFIGS_DIR
-        self.classes = [] if final_classes_order is None else final_classes_order
+        self.classes = final_classes_order
         self.train_rate = train_rate
         self.valid_rate = valid_rate
         self.test_rate = 1 - train_rate - valid_rate
@@ -100,7 +100,10 @@ class YOLODatasetProcessor:
                         f"中不存在 YOLO TXT 文件，请检查转换是否成功")
             raise FileNotFoundError(f"转换后的YOLO TXT 文件目录{self.yolo_staged_labels_dir} "
                         f"中不存在 YOLO TXT 文件，请检查转换是否成功")
-        if not self.raw_images_path.exists() or not any(self.raw_images_path.glob("*.jpg")):
+        # 检查多种图像格式
+        image_extensions = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tiff", "*.webp"]
+        has_images = any(self.raw_images_path.glob(ext) for ext in image_extensions)
+        if not self.raw_images_path.exists() or not has_images:
             logger.error(f"原始图像目录{self.raw_images_path} 中不存在图片文件，请检查原始数据集是否正确")
             raise FileNotFoundError(f"原始图像目录{self.raw_images_path} 中不存在图片文件，请检查原始数据集是否正确")
         logger.info(f"原始图像及标注文件暂存区通过检查："
