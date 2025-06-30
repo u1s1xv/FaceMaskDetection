@@ -23,6 +23,9 @@ from utils import (
     RAW_IMAGES_DIR,
     ORIGINAL_ANNOTATIONS_DIR,
     YOLO_STAGED_LABELS_DIR,
+    CRAWLED_DATA_DIR,  # 爬虫数据目录
+    CRAWLED_IMAGES_DIR,  # 爬虫图像目录
+    CRAWLED_ORIGINAL_ANNOTATIONS_DIR,  # 爬虫原始标注目录
 )
 
 # 第一步：配置日志记录
@@ -64,6 +67,9 @@ def initialize_project():
         DATA_DIR / "test" / "labels",
         YOLO_STAGED_LABELS_DIR,
         ORIGINAL_ANNOTATIONS_DIR,
+        CRAWLED_DATA_DIR,
+        CRAWLED_IMAGES_DIR,
+        CRAWLED_ORIGINAL_ANNOTATIONS_DIR,
     ]
 
     logger.info(f"检查并创建核心项目目录结构".center(80, "="))
@@ -97,6 +103,8 @@ def initialize_project():
     raw_dirs_to_check = {
         "原始图像文件": RAW_IMAGES_DIR,
         "原始标注文件": ORIGINAL_ANNOTATIONS_DIR,
+        "爬虫图像文件": CRAWLED_IMAGES_DIR,
+        "爬虫标注文件": CRAWLED_ORIGINAL_ANNOTATIONS_DIR,
     }
     for desc, raw_dir in raw_dirs_to_check.items():
         if not raw_dir.exists():

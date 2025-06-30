@@ -5,7 +5,13 @@ __pycache__/
 .vscode/
 .idea/
 # Data directories - ignore large datasets but keep structure
-yoloserver/data/
+yoloserver/data/*
 !yoloserver/data/.keep
 !yoloserver/data/*/.keep
 !yoloserver/data/*/*/.keep
+!yoloserver/data/crawled
+
+# Logs directories
+yoloserver/logs/*
+!yoloserver/logs/.keep
+!yoloserver/logs/*/.keep

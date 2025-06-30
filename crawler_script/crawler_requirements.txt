@@ -1,0 +1,5 @@
+requests>=2.25.1
+beautifulsoup4>=4.9.3
+lxml>=4.6.3
+Pillow>=8.2.0
+pathlib2>=2.3.6
