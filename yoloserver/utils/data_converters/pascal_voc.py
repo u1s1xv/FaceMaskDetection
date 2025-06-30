@@ -120,6 +120,7 @@ def convert_pascal_voc_to_yolo(xml_input_dir: Path, output_yolo_txt_dir: Path,
                     name_elem = obj.find("name")
                     if name_elem is not None and name_elem.text:
                         unique_classes.add(name_elem.text.strip())
+                logger.debug(f"[DEBUG] {xml_file.name} 当前已收集类别: {unique_classes}")
             except ET.ParseError as e:
                 logger.warning(f"扫描XML文件 '{xml_file.name}' 时解析错误: {e}")
             except Exception as e:

@@ -47,7 +47,7 @@ def run_training(model, yolo_args):
     return result
 
 def main(args, logger):
-    logger.info("YOLO 肿瘤检测训练脚本启动".center(80, "="))
+    logger.info("YOLO 口罩检测训练脚本启动".center(80, "="))
     try:
         yaml_config = {}
         if args.use_yaml:
@@ -88,7 +88,7 @@ def main(args, logger):
                             project_args.weights,
                             CHECKPOINTS_DIR, logger)
 
-        logger.info(f"YOLO 肿瘤检测训练脚本结束")
+        logger.info(f"YOLO 口罩检测训练脚本结束")
     except Exception as e:
         logger.error(f"参数合并失败: {e}")
         return

@@ -20,14 +20,14 @@ BASE_RADIUS = 4  # 默认圆角半径
 TEXT_COLOR = (0, 0, 0)  # 默认文本颜色（BGR，黑色）
 
 LABEL_MAPPING = {
-    "glioma_tumor": "胶质瘤",
-    "meningioma_tumor": "脑膜瘤",
-    "pituitary_tumor": "垂体瘤"
+    "with_mask": "正确戴口罩",
+    "without_mask": "未戴口罩",
+    "mask_weared_incorrect": "错误戴口罩"
 }
 COLOR_MAPPING = {
-    "glioma_tumor": (255, 0, 0),  # 红色 (BGR)
-    "meningioma_tumor": (0, 255, 0),  # 绿色 (BGR)
-    "pituitary_tumor": (240, 234, 24)  # 蓝色 (BGR)
+    "with_mask": (0, 255, 0),  # 绿色 (BGR)
+    "without_mask": (255, 0, 0),  # 红色 (BGR)
+    "mask_weared_incorrect": (240, 234, 24)  # 蓝色 (BGR)
 }
 
 

@@ -114,7 +114,7 @@ def main():
     except Exception as e:
         logger.error(f"An error occurred: {e}")
     finally:
-        logger.info(f"YOLO 肿瘤检测验证脚本结束")
+        logger.info(f"YOLO 口罩检测验证脚本结束")
 
 if __name__ == "__main__":
     main()

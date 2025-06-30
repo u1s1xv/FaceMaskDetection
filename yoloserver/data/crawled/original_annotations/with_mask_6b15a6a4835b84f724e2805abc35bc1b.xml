@@ -1,0 +1,26 @@
+<annotation>
+	<folder>2</folder>
+	<filename>with_mask_6b15a6a4835b84f724e2805abc35bc1b.jpg</filename>
+	<path>C:\windows_v1.8.1\2\with_mask_6b15a6a4835b84f724e2805abc35bc1b.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>0</width>
+		<height>0</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>with_mask</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>326</xmin>
+			<ymin>16</ymin>
+			<xmax>558</xmax>
+			<ymax>304</ymax>
+		</bndbox>
+	</object>
+</annotation>

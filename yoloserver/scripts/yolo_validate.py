@@ -43,7 +43,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--task', '-t',
         type=str,
-        default="segmentation",  # 默认值，根据常见使用情况将默认改为detection
+        default="detection",  # 默认值，根据常见使用情况将默认改为detection
         choices=["detection", "segmentation"],
         help="任务类型：'detection' (目标检测) 或 'segmentation' (实例分割)。"
     )
