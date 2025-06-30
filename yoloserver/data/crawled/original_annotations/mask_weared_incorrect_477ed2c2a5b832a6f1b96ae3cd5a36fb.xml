@@ -1,0 +1,26 @@
+<annotation>
+	<folder>1</folder>
+	<filename>mask_weared_incorrect_477ed2c2a5b832a6f1b96ae3cd5a36fb.jpg</filename>
+	<path>C:\Desktop\biaozhu\1\mask_weared_incorrect_477ed2c2a5b832a6f1b96ae3cd5a36fb.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>612</width>
+		<height>408</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>mask_weared_incorrect</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>213</xmin>
+			<ymin>38</ymin>
+			<xmax>400</xmax>
+			<ymax>292</ymax>
+		</bndbox>
+	</object>
+</annotation>
