@@ -381,7 +381,7 @@ if __name__ == "__main__":
                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("--format", type=str,
-                        default="coco",
+                        default="pascal_voc",
                         choices=["coco", "pascal_voc", "yolo"],
                         help="支持的数据集标注格式，coco, pascal_voc, yolo")
 
