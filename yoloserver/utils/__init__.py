@@ -21,5 +21,8 @@ from .paths import (
     RAW_IMAGES_DIR,
     ORIGINAL_ANNOTATIONS_DIR,
     YOLO_STAGED_LABELS_DIR,
+    CRAWLED_DATA_DIR,  # 爬虫数据目录
+    CRAWLED_IMAGES_DIR,  # 爬虫图像目录
+    CRAWLED_ORIGINAL_ANNOTATIONS_DIR,  # 爬虫原始标注目录
     SCRIPTS_DIR
 )
