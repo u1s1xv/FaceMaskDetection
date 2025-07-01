@@ -84,8 +84,105 @@
                 </div>
             </div>
         </div>
+
+        <!-- 大模型API分析模块 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-robot"></i> AI智能分析
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- 左侧：输入区域 -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="llmPrompt" class="form-label">
+                                <i class="fas fa-comment-dots"></i> 分析提示词
+                            </label>
+                            <textarea class="form-control llm-prompt-textarea"
+                                      id="llmPrompt"
+                                      rows="3"
+                                      placeholder="请输入您想要AI分析的问题，例如：
+• 分析这张图片中的口罩佩戴情况
+• 给出口罩佩戴的改进建议
+• 评估整体的防疫合规性">基于检测结果，请分析这张图片中的口罩佩戴情况，并给出专业的评估和建议。</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="llmModel" class="form-label">
+                                <i class="fas fa-brain"></i> 选择AI模型
+                            </label>
+                            <select class="form-select llm-model-select" id="llmModel">
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (快速)</option>
+                                <option value="gpt-4" selected>GPT-4 (精准)</option>
+                                <option value="claude-3-sonnet">Claude-3 Sonnet</option>
+                                <option value="gemini-pro">Gemini Pro</option>
+                            </select>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="button"
+                                    class="btn btn-primary llm-analysis-btn"
+                                    id="startLLMAnalysis"
+                                    onclick="startLLMAnalysis()">
+                                <i class="fas fa-magic"></i> 开始AI分析
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 右侧：结果显示区域 -->
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-lightbulb"></i> AI分析结果
+                            </label>
+                        </div>
+
+                        <!-- 加载状态 -->
+                        <div id="llmLoadingState" class="text-center py-4 llm-loading-animation" style="display: none;">
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">分析中...</span>
+                            </div>
+                            <p class="text-muted">AI正在分析中，请稍候...</p>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                     role="progressbar"
+                                     style="width: 100%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 结果显示 -->
+                        <div id="llmResultArea" class="llm-result-area" style="min-height: 180px;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-robot fa-2x mb-3 ai-icon-animated"></i>
+                                <p>点击"开始AI分析"按钮，获取专业的智能分析结果</p>
+                            </div>
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <div class="mt-3 llm-action-buttons d-flex gap-2">
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    id="copyLLMResult"
+                                    onclick="copyLLMResult()"
+                                    style="display: none;">
+                                <i class="fas fa-copy"></i> 复制结果
+                            </button>
+                            <button type="button"
+                                    class="btn btn-outline-info btn-sm"
+                                    id="downloadLLMResult"
+                                    onclick="downloadLLMResult()"
+                                    style="display: none;">
+                                <i class="fas fa-download"></i> 下载分析报告
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    
+
     <!-- 统计信息 -->
     <div class="col-lg-4">
         <!-- 检测摘要 -->
@@ -193,117 +290,6 @@
     </div>
 </div>
 
-<!-- 大模型分析板块 -->
-<div class="llm-analysis-section" data-record-id="{{ record.id }}">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-brain"></i> AI智能分析
-                        <small class="text-muted ms-2">基于检测结果的深度分析</small>
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <!-- 消息提示区域 -->
-                    <div class="llm-messages"></div>
-
-                    <!-- 输入区域 -->
-                    <div class="llm-input-area">
-                        <div class="row">
-                            <div class="col-12">
-                                <label for="llmPrompt" class="form-label fw-bold">
-                                    <i class="fas fa-comment-dots"></i> 请输入您的问题或分析需求
-                                </label>
-                                <textarea
-                                    id="llmPrompt"
-                                    class="form-control llm-prompt-input"
-                                    rows="3"
-                                    placeholder="例如：请分析这次检测的结果，给出口罩佩戴情况的总结和建议..."
-                                    maxlength="1000"></textarea>
-                                <div class="form-text">
-                                    <i class="fas fa-info-circle"></i>
-                                    支持Ctrl+Enter快速发送，最多1000字符
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-12">
-                                <div class="d-flex gap-2 flex-wrap">
-                                    <button type="button" class="btn btn-primary llm-submit-btn">
-                                        <i class="fas fa-paper-plane me-2"></i>发送分析请求
-                                    </button>
-                                    <button type="button" class="btn btn-outline-secondary llm-clear-btn">
-                                        <i class="fas fa-eraser me-2"></i>清除内容
-                                    </button>
-                                    <div class="ms-auto">
-                                        <small class="text-muted">
-                                            <i class="fas fa-robot me-1"></i>
-                                            由AI大模型提供分析支持
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 加载状态 -->
-                    <div class="llm-loading">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">分析中...</span>
-                        </div>
-                        <div class="mt-3">
-                            <h6>AI正在分析检测结果...</h6>
-                            <p class="text-muted mb-0">请稍候，这可能需要几秒钟时间</p>
-                        </div>
-                    </div>
-
-                    <!-- 响应区域 -->
-                    <div class="llm-response-area d-none">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">
-                                <i class="fas fa-lightbulb text-warning"></i> AI分析结果
-                            </h6>
-                            <button type="button" class="btn btn-sm btn-outline-primary llm-copy-btn">
-                                <i class="fas fa-copy me-1"></i>复制
-                            </button>
-                        </div>
-                        <div class="llm-response-content"></div>
-                    </div>
-
-                    <!-- 快捷提示 -->
-                    <div class="mt-3">
-                        <div class="row">
-                            <div class="col-12">
-                                <h6 class="text-muted mb-2">
-                                    <i class="fas fa-magic"></i> 快捷提示词
-                                </h6>
-                                <div class="d-flex gap-2 flex-wrap">
-                                    <button type="button" class="btn btn-sm btn-outline-info quick-prompt"
-                                            data-prompt="请分析这次检测的整体情况，包括口罩佩戴合规率和主要问题">
-                                        整体分析
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-outline-info quick-prompt"
-                                            data-prompt="基于检测结果，给出改进口罩佩戴情况的具体建议">
-                                        改进建议
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-outline-info quick-prompt"
-                                            data-prompt="请解释检测结果中各项数据的含义和重要性">
-                                        数据解读
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-outline-info quick-prompt"
-                                            data-prompt="对比理想的口罩佩戴标准，评估当前检测结果">
-                                        标准对比
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- 详细检测数据模态框 -->
 <div class="modal fade" id="detailsModal" tabindex="-1">
@@ -383,5 +369,267 @@ function checkStatus() {
 // 每3秒检查一次状态
 setInterval(checkStatus, 3000);
 {% endif %}
+
+// 大模型API相关功能
+let llmAnalysisInProgress = false;
+let llmResultContent = '';
+
+// 开始LLM分析
+function startLLMAnalysis() {
+    if (llmAnalysisInProgress) {
+        return;
+    }
+
+    const prompt = $('#llmPrompt').val().trim();
+    const model = $('#llmModel').val();
+
+    if (!prompt) {
+        alert('请输入分析提示词');
+        return;
+    }
+
+    // 设置加载状态
+    setLLMLoadingState(true);
+
+    // 准备请求数据
+    const requestData = {
+        prompt: prompt,
+        model: model,
+        record_id: {{ record.id }},
+        detection_data: {
+            total_detections: {{ record.total_detections }},
+            with_mask_count: {{ record.with_mask_count }},
+            without_mask_count: {{ record.without_mask_count }},
+            incorrect_mask_count: {{ record.incorrect_mask_count }},
+            compliance_rate: {{ detection_summary.compliance_rate }},
+            model_name: '{{ record.model_name }}',
+            confidence_threshold: {{ record.confidence_threshold }},
+            detection_details: {{ record.detection_details|safe }}
+        }
+    };
+
+    // 发送API请求
+    $.ajax({
+        url: '/api/llm-analysis/',
+        type: 'POST',
+        data: JSON.stringify(requestData),
+        contentType: 'application/json',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        timeout: 60000, // 60秒超时
+        success: function(response) {
+            if (response.success) {
+                displayLLMResult(response.analysis);
+                llmResultContent = response.analysis;
+            } else {
+                displayLLMError(response.error || '分析失败，请重试');
+            }
+        },
+        error: function(xhr, status, error) {
+            let errorMsg = '网络错误，请检查连接后重试';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMsg = xhr.responseJSON.error;
+            } else if (status === 'timeout') {
+                errorMsg = '请求超时，请重试';
+            }
+            displayLLMError(errorMsg);
+        },
+        complete: function() {
+            setLLMLoadingState(false);
+        }
+    });
+}
+
+// 设置加载状态
+function setLLMLoadingState(loading) {
+    llmAnalysisInProgress = loading;
+    const $button = $('#startLLMAnalysis');
+    const $loadingState = $('#llmLoadingState');
+    const $resultArea = $('#llmResultArea');
+
+    if (loading) {
+        $button.prop('disabled', true)
+               .html('<i class="fas fa-spinner fa-spin"></i> 分析中...');
+        $loadingState.show();
+        $resultArea.hide();
+    } else {
+        $button.prop('disabled', false)
+               .html('<i class="fas fa-magic"></i> 开始AI分析');
+        $loadingState.hide();
+        $resultArea.show();
+    }
+}
+
+// 显示LLM分析结果
+function displayLLMResult(analysis) {
+    const $resultArea = $('#llmResultArea');
+    const $copyBtn = $('#copyLLMResult');
+    const $downloadBtn = $('#downloadLLMResult');
+
+    // 格式化分析结果
+    const formattedAnalysis = formatAnalysisResult(analysis);
+
+    $resultArea.html(`
+        <div class="llm-result-success">
+            <div class="d-flex align-items-center mb-2">
+                <i class="fas fa-check-circle text-success me-2"></i>
+                <strong>AI分析完成</strong>
+            </div>
+            <div class="llm-result-content">${formattedAnalysis}</div>
+        </div>
+    `).addClass('has-content');
+
+    // 显示操作按钮
+    $copyBtn.show();
+    $downloadBtn.show();
+}
+
+// 显示LLM错误信息
+function displayLLMError(error) {
+    const $resultArea = $('#llmResultArea');
+
+    $resultArea.html(`
+        <div class="llm-result-warning">
+            <div class="d-flex align-items-center mb-2">
+                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                <strong>分析失败</strong>
+            </div>
+            <div class="text-muted">${error}</div>
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="fas fa-lightbulb"></i>
+                    建议：检查网络连接或稍后重试
+                </small>
+            </div>
+        </div>
+    `).removeClass('has-content');
+}
+
+// 格式化分析结果
+function formatAnalysisResult(analysis) {
+    // 将换行符转换为HTML换行
+    let formatted = analysis.replace(/\n/g, '<br>');
+
+    // 高亮关键词
+    const keywords = ['正确佩戴', '未佩戴', '错误佩戴', '建议', '总结', '分析', '合规率'];
+    keywords.forEach(keyword => {
+        const regex = new RegExp(`(${keyword})`, 'gi');
+        formatted = formatted.replace(regex, '<strong class="text-primary">$1</strong>');
+    });
+
+    return formatted;
+}
+
+// 复制LLM结果
+function copyLLMResult() {
+    if (!llmResultContent) {
+        alert('暂无结果可复制');
+        return;
+    }
+
+    // 创建临时文本区域
+    const textArea = document.createElement('textarea');
+    textArea.value = llmResultContent;
+    document.body.appendChild(textArea);
+    textArea.select();
+
+    try {
+        document.execCommand('copy');
+        // 显示成功提示
+        const $btn = $('#copyLLMResult');
+        const originalText = $btn.html();
+        $btn.html('<i class="fas fa-check"></i> 已复制').addClass('btn-success').removeClass('btn-outline-secondary');
+
+        setTimeout(() => {
+            $btn.html(originalText).removeClass('btn-success').addClass('btn-outline-secondary');
+        }, 2000);
+    } catch (err) {
+        alert('复制失败，请手动选择文本复制');
+    }
+
+    document.body.removeChild(textArea);
+}
+
+// 下载LLM分析报告
+function downloadLLMResult() {
+    if (!llmResultContent) {
+        alert('暂无结果可下载');
+        return;
+    }
+
+    // 创建完整的分析报告
+    const reportContent = `
+口罩检测AI分析报告
+==================
+
+检测记录ID: {{ record.id }}
+检测时间: {{ record.upload_time|date:"Y-m-d H:i:s" }}
+使用模型: {{ record.model_name }}
+
+检测结果统计:
+- 总检测数量: {{ record.total_detections }}
+- 正确佩戴: {{ record.with_mask_count }}
+- 未佩戴口罩: {{ record.without_mask_count }}
+- 错误佩戴: {{ record.incorrect_mask_count }}
+- 合规率: {{ detection_summary.compliance_rate }}%
+
+AI智能分析:
+${llmResultContent}
+
+报告生成时间: ${new Date().toLocaleString('zh-CN')}
+    `.trim();
+
+    // 创建下载链接
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `口罩检测AI分析报告_${new Date().getTime()}.txt`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+}
+
+// 页面加载完成后的初始化
+$(document).ready(function() {
+    // 为提示词输入框添加字符计数
+    $('#llmPrompt').on('input', function() {
+        const length = $(this).val().length;
+        const maxLength = 1000;
+
+        if (length > maxLength * 0.8) {
+            $(this).addClass('border-warning');
+        } else {
+            $(this).removeClass('border-warning');
+        }
+    });
+
+    // 模型选择变化时的提示
+    $('#llmModel').on('change', function() {
+        const model = $(this).val();
+        let tip = '';
+
+        switch(model) {
+            case 'gpt-3.5-turbo':
+                tip = '快速响应，适合简单分析';
+                break;
+            case 'gpt-4':
+                tip = '深度分析，结果更准确';
+                break;
+            case 'claude-3-sonnet':
+                tip = '平衡性能，综合分析能力强';
+                break;
+            case 'gemini-pro':
+                tip = '多模态分析，支持图像理解';
+                break;
+        }
+
+        // 可以在这里显示模型提示信息
+        console.log('选择模型:', model, '-', tip);
+    });
+});
 </script>
 {% endblock %}

@@ -9,12 +9,56 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- 自定义样式 -->
-    {% load static %}
-    <link href="{% static 'css/custom.css' %}" rel="stylesheet">
-
-    <!-- CSRF Token for AJAX -->
-    <meta name="csrf-token" content="{{ csrf_token }}">
+    
+    <style>
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #0d6efd;
+            background-color: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #0d6efd;
+            background-color: #e7f3ff;
+        }
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .detection-card {
+            transition: transform 0.2s;
+        }
+        .detection-card:hover {
+            transform: translateY(-5px);
+        }
+        .status-badge {
+            font-size: 0.8em;
+        }
+        .progress-container {
+            display: none;
+        }
+        .result-comparison {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        @media (max-width: 768px) {
+            .result-comparison {
+                flex-direction: column;
+            }
+        }
+    </style>
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -105,11 +149,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <!-- 检测功能JS -->
-    <script src="{% static 'js/detection.js' %}"></script>
-    <!-- 大模型集成JS -->
-    <script src="{% static 'js/llm-integration.js' %}"></script>
-
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

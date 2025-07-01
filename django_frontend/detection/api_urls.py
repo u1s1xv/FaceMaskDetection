@@ -12,8 +12,6 @@ urlpatterns = [
     path('history/', api_views.api_get_history, name='api_get_history'),
     path('delete/<int:record_id>/', api_views.api_delete_record, name='api_delete_record'),
     path('clear-cache/', api_views.api_clear_cache, name='api_clear_cache'),
-
-    # LLM API端点
-    path('llm/analyze/', api_views.api_llm_analyze, name='api_llm_analyze'),
-    path('llm/history/<int:record_id>/', api_views.api_get_llm_history, name='api_get_llm_history'),
+    # 大模型API
+    path('llm-analysis/', api_views.api_llm_analysis, name='api_llm_analysis'),
 ]
