@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- 页面标题 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-cogs"></i> 模型管理
+            </h2>
+            <a href="{% url 'index' %}" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> 返回检测
+            </a>
+        </div>
+        
+        <!-- 模型状态概览 -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h4 class="text-primary">{{ available_models|length }}</h4>
+                        <small class="text-muted">可用模型文件</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h4 class="text-success">{{ model_status|length }}</h4>
+                        <small class="text-muted">已配置模型</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h4 class="text-warning">{{ orphan_models|length }}</h4>
+                        <small class="text-muted">未配置模型</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h4 class="text-info">
+                            {% for status in model_status %}
+                                {% if status.config.is_active and status.file_exists %}1{% endif %}
+                            {% empty %}0{% endfor %}
+                        </h4>
+                        <small class="text-muted">当前激活</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 可用模型文件 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-archive"></i> 可用模型文件
+                    <span class="badge bg-primary ms-2">{{ available_models|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if available_models %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>模型名称</th>
+                                <th>描述</th>
+                                <th>文件大小</th>
+                                <th>配置状态</th>
+                                <th>准确率</th>
+                                <th>推理速度</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for model in available_models %}
+                            <tr>
+                                <td>
+                                    <strong>{{ model.name }}</strong>
+                                </td>
+                                <td>{{ model.description }}</td>
+                                <td>{{ model.size }} MB</td>
+                                <td>
+                                    {% for status in model_status %}
+                                        {% if status.config.name == model.name %}
+                                            {% if status.config.is_active %}
+                                                <span class="badge bg-success">已激活</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">已配置</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% empty %}
+                                        {% if model.name in orphan_models|map:"name" %}
+                                            <span class="badge bg-warning">未配置</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if model.name not in model_status|map:"config.name" and model in orphan_models %}
+                                        <span class="badge bg-warning">未配置</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if model.accuracy %}
+                                        {{ model.accuracy|floatformat:2 }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if model.inference_speed %}
+                                        {{ model.inference_speed|floatformat:1 }}ms
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary btn-sm" 
+                                                onclick="testModel('{{ model.name }}')">
+                                            <i class="fas fa-play"></i> 测试
+                                        </button>
+                                        <a href="/admin/detection/modelconfig/" 
+                                           class="btn btn-outline-secondary btn-sm" 
+                                           target="_blank">
+                                            <i class="fas fa-cog"></i> 配置
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                    <h5>未找到模型文件</h5>
+                    <p class="text-muted">请确保在 yoloserver/models/checkpoints/ 目录下有 .pt 模型文件</p>
+                    <div class="alert alert-info">
+                        <strong>模型文件路径:</strong> {{ YOLO_MODELS_DIR|default:"yoloserver/models/checkpoints/" }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 配置状态详情 -->
+        {% if model_status %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-database"></i> 数据库配置状态
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>配置名称</th>
+                                <th>文件状态</th>
+                                <th>激活状态</th>
+                                <th>描述</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for status in model_status %}
+                            <tr>
+                                <td>{{ status.config.name }}</td>
+                                <td>
+                                    {% if status.file_exists %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> 文件存在
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> 文件缺失
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if status.config.is_active %}
+                                        <span class="badge bg-success">激活</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">禁用</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ status.config.description|truncatechars:50 }}</td>
+                                <td>{{ status.config.created_time|date:"m-d H:i" }}</td>
+                                <td>
+                                    <a href="/admin/detection/modelconfig/{{ status.config.id }}/change/" 
+                                       class="btn btn-outline-primary btn-sm" 
+                                       target="_blank">
+                                        <i class="fas fa-edit"></i> 编辑
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 使用说明 -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> 使用说明
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>模型文件管理</h6>
+                        <ul class="small">
+                            <li>将训练好的 .pt 模型文件放入 <code>yoloserver/models/checkpoints/</code> 目录</li>
+                            <li>系统会自动扫描该目录下的所有 .pt 文件</li>
+                            <li>只有存在的模型文件才会出现在检测页面的下拉菜单中</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>模型配置</h6>
+                        <ul class="small">
+                            <li>在管理后台可以为模型添加详细描述和性能参数</li>
+                            <li>可以设置模型的激活状态</li>
+                            <li>配置的模型信息会显示在选择下拉菜单中</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function testModel(modelName) {
+    alert('模型测试功能开发中...\n模型: ' + modelName);
+    // TODO: 实现模型测试功能
+}
+
+// 定期刷新页面以更新模型状态
+setTimeout(function() {
+    // 可以添加AJAX刷新逻辑
+}, 30000);
+</script>
+{% endblock %}

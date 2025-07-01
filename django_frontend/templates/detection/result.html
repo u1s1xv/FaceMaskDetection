@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- 页面标题 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-chart-line"></i> 检测结果 #{{ record.id }}
+            </h2>
+            <div>
+                <a href="{% url 'index' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-plus"></i> 新检测
+                </a>
+                <a href="{% url 'history' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-list"></i> 历史记录
+                </a>
+            </div>
+        </div>
+        
+        <!-- 状态信息 -->
+        {% if record.status == 'completed' %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> 检测完成！
+                处理时间: {{ record.processing_time|floatformat:2 }} 秒
+            </div>
+        {% elif record.status == 'failed' %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> 检测失败: {{ record.error_message }}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin"></i> 正在处理中...
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if record.status == 'completed' %}
+<div class="row">
+    <!-- 图片对比 -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-images"></i> 检测结果对比
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="result-comparison">
+                    <!-- 原始图片 -->
+                    <div class="flex-fill">
+                        <h6 class="text-center mb-3">原始图片</h6>
+                        <div class="text-center">
+                            <img src="{{ record.original_image.url }}" 
+                                 class="img-fluid rounded shadow" 
+                                 alt="原始图片"
+                                 style="max-height: 400px;">
+                        </div>
+                    </div>
+                    
+                    <!-- 检测结果 -->
+                    <div class="flex-fill">
+                        <h6 class="text-center mb-3">检测结果</h6>
+                        <div class="text-center">
+                            {% if record.result_image %}
+                                <img src="{{ record.result_image.url }}" 
+                                     class="img-fluid rounded shadow" 
+                                     alt="检测结果"
+                                     style="max-height: 400px;">
+                            {% else %}
+                                <div class="bg-light rounded d-flex align-items-center justify-content-center" 
+                                     style="height: 300px;">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-image fa-3x mb-3"></i>
+                                        <p>暂无结果图片</p>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 统计信息 -->
+    <div class="col-lg-4">
+        <!-- 检测摘要 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> 检测摘要
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center mb-3">
+                    <div class="col-12">
+                        <h3 class="text-primary">{{ record.total_detections }}</h3>
+                        <small class="text-muted">总检测数量</small>
+                    </div>
+                </div>
+                
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="border-end">
+                            <h5 class="text-success">{{ record.with_mask_count }}</h5>
+                            <small class="text-muted">正确</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border-end">
+                            <h5 class="text-danger">{{ record.without_mask_count }}</h5>
+                            <small class="text-muted">未戴</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <h5 class="text-warning">{{ record.incorrect_mask_count }}</h5>
+                        <small class="text-muted">错误</small>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between">
+                        <span>合规率:</span>
+                        <strong class="text-success">{{ detection_summary.compliance_rate }}%</strong>
+                    </div>
+                </div>
+                
+                <div class="progress">
+                    <div class="progress-bar bg-success" 
+                         style="width: {{ detection_summary.compliance_rate }}%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 检测参数 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-cog"></i> 检测参数
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <strong>模型:</strong> {{ record.model_name }}
+                </div>
+                <div class="mb-2">
+                    <strong>置信度:</strong> {{ record.confidence_threshold }}
+                </div>
+                <div class="mb-2">
+                    <strong>IOU阈值:</strong> {{ record.iou_threshold }}
+                </div>
+                <div class="mb-2">
+                    <strong>图像尺寸:</strong> {{ record.image_size }}x{{ record.image_size }}
+                </div>
+                <div class="mb-2">
+                    <strong>检测时间:</strong> {{ record.upload_time|date:"Y-m-d H:i:s" }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if record.result_image %}
+                    <a href="{{ record.result_image.url }}" 
+                       class="btn btn-success" 
+                       download="detection_result_{{ record.id }}.png">
+                        <i class="fas fa-download"></i> 下载结果图片
+                    </a>
+                    {% endif %}
+                    
+                    <button class="btn btn-info" onclick="showDetails()">
+                        <i class="fas fa-info-circle"></i> 查看详细数据
+                    </button>
+                    
+                    <form method="post" action="{% url 'delete_record' record.id %}" 
+                          onsubmit="return confirm('确定要删除这条记录吗？');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-trash"></i> 删除记录
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 详细检测数据模态框 -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-list-alt"></i> 详细检测数据
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {% if record.detection_details %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>类别</th>
+                                <th>置信度</th>
+                                <th>位置 (x, y)</th>
+                                <th>尺寸 (w, h)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detection in record.detection_details %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    {% if detection.class_name == 'with_mask' %}
+                                        <span class="badge bg-success">正确戴口罩</span>
+                                    {% elif detection.class_name == 'without_mask' %}
+                                        <span class="badge bg-danger">未戴口罩</span>
+                                    {% elif detection.class_name == 'mask_weared_incorrect' %}
+                                        <span class="badge bg-warning">错误戴口罩</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ detection.class_name }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ detection.confidence|floatformat:3 }}</td>
+                                <td>{{ detection.x_center|floatformat:3 }}, {{ detection.y_center|floatformat:3 }}</td>
+                                <td>{{ detection.width|floatformat:3 }}, {{ detection.height|floatformat:3 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center">暂无详细检测数据</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showDetails() {
+    $('#detailsModal').modal('show');
+}
+
+// 如果状态不是完成，定期检查状态
+{% if record.status != 'completed' and record.status != 'failed' %}
+function checkStatus() {
+    $.get('{% url "detection_status" record.id %}', function(data) {
+        if (data.status === 'completed' || data.status === 'failed') {
+            location.reload();
+        }
+    });
+}
+
+// 每3秒检查一次状态
+setInterval(checkStatus, 3000);
+{% endif %}
+</script>
+{% endblock %}

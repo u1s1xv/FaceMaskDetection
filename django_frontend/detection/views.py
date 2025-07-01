@@ -1,0 +1,235 @@
+"""
+视图函数
+"""
+from django.shortcuts import render, get_object_or_404, redirect
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.contrib import messages
+from django.core.paginator import Paginator
+from django.db.models import Q
+import json
+import logging
+
+from .models import DetectionRecord, ModelConfig
+from .forms import ImageUploadForm, DetectionParametersForm
+from .services import YOLOInferenceService
+
+logger = logging.getLogger(__name__)
+
+
+def index(request):
+    """主页视图"""
+    form = ImageUploadForm()
+    recent_records = DetectionRecord.objects.filter(
+        status='completed'
+    ).order_by('-upload_time')[:5]
+    
+    context = {
+        'form': form,
+        'recent_records': recent_records,
+        'page_title': '口罩检测系统'
+    }
+    return render(request, 'detection/index.html', context)
+
+
+def upload_and_detect(request):
+    """上传图片并进行检测"""
+    if request.method == 'POST':
+        form = ImageUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                # 保存记录
+                record = form.save(commit=False)
+                record.status = 'pending'
+                record.save()
+                
+                # 执行检测
+                inference_service = YOLOInferenceService()
+                result = inference_service.run_inference(
+                    image_path=record.original_image.path,
+                    model_name=record.model_name,
+                    confidence=record.confidence_threshold,
+                    iou=record.iou_threshold,
+                    imgsz=record.image_size
+                )
+                
+                # 更新记录
+                record.status = 'processing'
+                record.total_detections = result['total_detections']
+                record.with_mask_count = result['with_mask_count']
+                record.without_mask_count = result['without_mask_count']
+                record.incorrect_mask_count = result['incorrect_mask_count']
+                record.processing_time = result['processing_time']
+                record.detection_details = result['detections']
+                
+                # 保存结果图像
+                if result.get('beautified_image_path'):
+                    result_image = inference_service.copy_result_image(
+                        result['beautified_image_path'], 
+                        record.result_image
+                    )
+                    if result_image:
+                        record.result_image.save(
+                            f'result_{record.id}.png',
+                            result_image,
+                            save=False
+                        )
+                
+                record.status = 'completed'
+                record.save()
+                
+                messages.success(request, '检测完成！')
+                return redirect('detection_result', record_id=record.id)
+                
+            except Exception as e:
+                logger.error(f"检测失败: {str(e)}")
+                if 'record' in locals():
+                    record.status = 'failed'
+                    record.error_message = str(e)
+                    record.save()
+                messages.error(request, f'检测失败: {str(e)}')
+                return redirect('index')
+        else:
+            messages.error(request, '表单验证失败，请检查输入')
+    
+    return redirect('index')
+
+
+def detection_result(request, record_id):
+    """检测结果页面"""
+    record = get_object_or_404(DetectionRecord, id=record_id)
+    
+    context = {
+        'record': record,
+        'detection_summary': record.detection_summary,
+        'page_title': f'检测结果 #{record.id}'
+    }
+    return render(request, 'detection/result.html', context)
+
+
+def history(request):
+    """历史记录页面"""
+    # 搜索功能
+    search_query = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+    
+    records = DetectionRecord.objects.all()
+    
+    if search_query:
+        records = records.filter(
+            Q(id__icontains=search_query) |
+            Q(model_name__icontains=search_query)
+        )
+    
+    if status_filter:
+        records = records.filter(status=status_filter)
+    
+    records = records.order_by('-upload_time')
+    
+    # 分页
+    paginator = Paginator(records, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'status_choices': DetectionRecord.STATUS_CHOICES,
+        'page_title': '检测历史'
+    }
+    return render(request, 'detection/history.html', context)
+
+
+def delete_record(request, record_id):
+    """删除检测记录"""
+    if request.method == 'POST':
+        record = get_object_or_404(DetectionRecord, id=record_id)
+        try:
+            # 删除相关文件
+            if record.original_image:
+                record.original_image.delete()
+            if record.result_image:
+                record.result_image.delete()
+            
+            record.delete()
+            messages.success(request, '记录删除成功')
+        except Exception as e:
+            logger.error(f"删除记录失败: {str(e)}")
+            messages.error(request, '删除失败')
+    
+    return redirect('history')
+
+
+def model_management(request):
+    """模型管理页面"""
+    # 获取数据库中的模型配置
+    db_models = ModelConfig.objects.all().order_by('-created_time')
+
+    # 获取实际存在的模型文件
+    try:
+        inference_service = YOLOInferenceService()
+        available_models = inference_service.get_available_models()
+    except Exception as e:
+        logger.error(f"获取可用模型失败: {str(e)}")
+        available_models = []
+
+    # 检查数据库模型与实际文件的匹配情况
+    model_status = []
+    for db_model in db_models:
+        file_exists = any(am['name'] == db_model.name for am in available_models)
+        model_status.append({
+            'config': db_model,
+            'file_exists': file_exists
+        })
+
+    # 检查是否有文件但没有数据库配置的模型
+    orphan_models = []
+    for available_model in available_models:
+        has_config = db_models.filter(name=available_model['name']).exists()
+        if not has_config:
+            orphan_models.append(available_model)
+
+    context = {
+        'model_status': model_status,
+        'available_models': available_models,
+        'orphan_models': orphan_models,
+        'page_title': '模型管理'
+    }
+    return render(request, 'detection/models.html', context)
+
+
+def settings_view(request):
+    """设置页面"""
+    if request.method == 'POST':
+        form = DetectionParametersForm(request.POST)
+        if form.is_valid():
+            # 保存默认参数到session
+            request.session['default_params'] = form.cleaned_data
+            messages.success(request, '默认参数已保存')
+    else:
+        # 从session加载默认参数
+        initial_data = request.session.get('default_params', {})
+        form = DetectionParametersForm(initial=initial_data)
+
+    context = {
+        'form': form,
+        'page_title': '系统设置'
+    }
+    return render(request, 'detection/settings.html', context)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_detection_status(request, record_id):
+    """获取检测状态API"""
+    try:
+        record = get_object_or_404(DetectionRecord, id=record_id)
+        return JsonResponse({
+            'status': record.status,
+            'progress': 100 if record.status == 'completed' else 50,
+            'message': '检测完成' if record.status == 'completed' else '检测中...'
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
