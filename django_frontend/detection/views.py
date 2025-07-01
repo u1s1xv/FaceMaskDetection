@@ -19,18 +19,52 @@ logger = logging.getLogger(__name__)
 
 
 def index(request):
-    """主页视图"""
+    """主页视图 - 系统概览"""
+    from django.db.models import Sum
+    import django
+    import sys
+
+    # 获取统计数据
+    stats = DetectionRecord.objects.filter(status='completed').aggregate(
+        total_detections=Sum('total_detections'),
+        with_mask_count=Sum('with_mask_count'),
+        without_mask_count=Sum('without_mask_count'),
+        incorrect_mask_count=Sum('incorrect_mask_count')
+    )
+
+    # 处理空值
+    for key, value in stats.items():
+        if value is None:
+            stats[key] = 0
+
+    # 获取最近检测记录
+    recent_records = DetectionRecord.objects.filter(
+        status='completed'
+    ).order_by('-upload_time')[:6]
+
+    context = {
+        'stats': stats,
+        'recent_records': recent_records,
+        'page_title': '口罩检测系统 - 首页',
+        'django_version': django.get_version(),
+        'python_version': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+    }
+    return render(request, 'detection/index.html', context)
+
+
+def detect(request):
+    """检测页面视图"""
     form = ImageUploadForm()
     recent_records = DetectionRecord.objects.filter(
         status='completed'
     ).order_by('-upload_time')[:5]
-    
+
     context = {
         'form': form,
         'recent_records': recent_records,
-        'page_title': '口罩检测系统'
+        'page_title': '图片检测'
     }
-    return render(request, 'detection/index.html', context)
+    return render(request, 'detection/detect.html', context)
 
 
 def upload_and_detect(request):
@@ -186,15 +220,43 @@ def model_management(request):
 
     # 检查是否有文件但没有数据库配置的模型
     orphan_models = []
+    db_model_names = set(db_models.values_list('name', flat=True))
     for available_model in available_models:
-        has_config = db_models.filter(name=available_model['name']).exists()
-        if not has_config:
+        if available_model['name'] not in db_model_names:
             orphan_models.append(available_model)
+
+    # 为每个可用模型添加配置状态信息
+    models_with_status = []
+    for model in available_models:
+        # 查找对应的数据库配置
+        db_config = db_models.filter(name=model['name']).first()
+
+        model_info = model.copy()
+        if db_config:
+            model_info['config_status'] = 'active' if db_config.is_active else 'configured'
+            model_info['config'] = db_config
+        else:
+            model_info['config_status'] = 'unconfigured'
+            model_info['config'] = None
+
+        models_with_status.append(model_info)
+
+    # 计算统计数字
+    total_files = len(available_models)
+    total_configured = len(db_models)
+    total_orphan = len(orphan_models)
+    total_active = sum(1 for model in models_with_status if model['config_status'] == 'active')
 
     context = {
         'model_status': model_status,
-        'available_models': available_models,
+        'available_models': models_with_status,
         'orphan_models': orphan_models,
+        'stats': {
+            'total_files': total_files,
+            'total_configured': total_configured,
+            'total_orphan': total_orphan,
+            'total_active': total_active,
+        },
         'page_title': '模型管理'
     }
     return render(request, 'detection/models.html', context)
@@ -208,14 +270,21 @@ def settings_view(request):
             # 保存默认参数到session
             request.session['default_params'] = form.cleaned_data
             messages.success(request, '默认参数已保存')
+            return redirect('settings')
     else:
         # 从session加载默认参数
         initial_data = request.session.get('default_params', {})
         form = DetectionParametersForm(initial=initial_data)
 
+    # 获取系统信息
+    import django
+    import sys
+
     context = {
         'form': form,
-        'page_title': '系统设置'
+        'page_title': '系统设置',
+        'django_version': django.get_version(),
+        'python_version': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
     }
     return render(request, 'detection/settings.html', context)
 

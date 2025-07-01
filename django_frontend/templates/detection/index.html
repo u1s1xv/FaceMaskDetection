@@ -3,284 +3,314 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- 上传区域 -->
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-upload"></i> 上传图片进行口罩检测
-                </h5>
-            </div>
-            <div class="card-body">
-                <form method="post" enctype="multipart/form-data" action="{% url 'upload_and_detect' %}" id="uploadForm">
-                    {% csrf_token %}
-                    
-                    <!-- 拖拽上传区域 -->
-                    <div class="upload-area" id="uploadArea">
-                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                        <h5>拖拽图片到此处或点击选择文件</h5>
-                        <p class="text-muted">支持 JPG, PNG, JPEG, BMP 格式，最大 10MB</p>
-                        {{ form.original_image }}
-                    </div>
-                    
-                    <!-- 图片预览 -->
-                    <div id="imagePreview" class="mt-3" style="display: none;">
-                        <img id="previewImg" class="preview-image" alt="预览图片">
-                    </div>
-                    
-                    <!-- 检测参数 -->
-                    <div class="row mt-4">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="{{ form.model_name.id_for_label }}" class="form-label">
-                                    {{ form.model_name.label }}
-                                    <a href="{% url 'model_management' %}" class="btn btn-sm btn-outline-info ms-2">
-                                        <i class="fas fa-cogs"></i> 管理模型
-                                    </a>
-                                </label>
-                                {{ form.model_name }}
-                                <div class="form-text">
-                                    <i class="fas fa-info-circle"></i>
-                                    只显示实际存在的模型文件
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="{{ form.image_size.id_for_label }}" class="form-label">
-                                    {{ form.image_size.label }}
-                                </label>
-                                {{ form.image_size }}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="{{ form.confidence_threshold.id_for_label }}" class="form-label">
-                                    {{ form.confidence_threshold.label }}
-                                </label>
-                                {{ form.confidence_threshold }}
-                                <div class="form-text">{{ form.confidence_threshold.help_text }}</div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="{{ form.iou_threshold.id_for_label }}" class="form-label">
-                                    {{ form.iou_threshold.label }}
-                                </label>
-                                {{ form.iou_threshold }}
-                                <div class="form-text">{{ form.iou_threshold.help_text }}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 提交按钮 -->
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
-                            <i class="fas fa-search"></i> 开始检测
-                        </button>
-                    </div>
-                    
-                    <!-- 进度条 -->
-                    <div class="progress-container mt-3">
-                        <div class="progress">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                 role="progressbar" style="width: 0%"></div>
-                        </div>
-                        <p class="text-center mt-2" id="progressText">正在处理...</p>
-                    </div>
-                </form>
+<!-- 欢迎横幅 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center py-5">
+                <h1 class="display-4 mb-3">
+                    <i class="fas fa-mask me-3"></i>口罩检测系统
+                </h1>
+                <p class="lead mb-4">基于YOLO11深度学习模型的智能口罩佩戴检测系统</p>
+                <a href="{% url 'detect' %}" class="btn btn-light btn-lg me-3">
+                    <i class="fas fa-upload"></i> 开始检测
+                </a>
+                <a href="{% url 'history' %}" class="btn btn-outline-light btn-lg">
+                    <i class="fas fa-history"></i> 查看历史
+                </a>
             </div>
         </div>
     </div>
-    
-    <!-- 侧边栏 -->
-    <div class="col-lg-4">
-        <!-- 系统信息 -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h6 class="card-title mb-0">
-                    <i class="fas fa-info-circle"></i> 系统信息
-                </h6>
-            </div>
+</div>
+
+<!-- 系统功能介绍 -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 text-center">
             <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-4">
-                        <div class="border-end">
-                            <h5 class="text-success">3</h5>
-                            <small class="text-muted">检测类别</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <div class="border-end">
-                            <h5 class="text-primary">YOLO11</h5>
-                            <small class="text-muted">AI模型</small>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <h5 class="text-warning">实时</h5>
-                        <small class="text-muted">检测速度</small>
-                    </div>
+                <div class="mb-3">
+                    <i class="fas fa-brain fa-3x text-primary"></i>
                 </div>
-                
-                <hr>
-                
-                <div class="mb-2">
-                    <span class="badge bg-success me-2">✓</span>
-                    <small>正确戴口罩</small>
-                </div>
-                <div class="mb-2">
-                    <span class="badge bg-danger me-2">✗</span>
-                    <small>未戴口罩</small>
-                </div>
-                <div class="mb-2">
-                    <span class="badge bg-warning me-2">⚠</span>
-                    <small>错误戴口罩</small>
-                </div>
+                <h5 class="card-title">AI智能检测</h5>
+                <p class="card-text">采用最新YOLO11模型，准确识别人员口罩佩戴情况，支持多种检测场景</p>
             </div>
         </div>
-        
-        <!-- 最近检测记录 -->
-        {% if recent_records %}
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="mb-3">
+                    <i class="fas fa-tachometer-alt fa-3x text-success"></i>
+                </div>
+                <h5 class="card-title">实时处理</h5>
+                <p class="card-text">毫秒级检测速度，支持批量处理，满足各种实时监控需求</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="mb-3">
+                    <i class="fas fa-chart-bar fa-3x text-info"></i>
+                </div>
+                <h5 class="card-title">数据统计</h5>
+                <p class="card-text">详细的检测报告和统计分析，帮助您了解口罩佩戴合规情况</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 统计数据 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h2 class="display-6">{{ stats.total_detections }}</h2>
+                <p class="mb-0">总检测次数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h2 class="display-6">{{ stats.with_mask_count }}</h2>
+                <p class="mb-0">正确戴口罩</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h2 class="display-6">{{ stats.without_mask_count }}</h2>
+                <p class="mb-0">未戴口罩</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <h2 class="display-6">{{ stats.incorrect_mask_count }}</h2>
+                <p class="mb-0">错误戴口罩</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 数据可视化 -->
+<div class="row mb-4">
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h6 class="card-title mb-0">
-                    <i class="fas fa-clock"></i> 最近检测
-                </h6>
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie"></i> 检测结果分布
+                </h5>
             </div>
             <div class="card-body">
-                {% for record in recent_records %}
-                <div class="d-flex align-items-center mb-3">
-                    <div class="flex-shrink-0">
-                        {% if record.result_image %}
-                            <img src="{{ record.result_image.url }}" 
-                                 class="rounded" width="50" height="50" 
-                                 style="object-fit: cover;">
-                        {% else %}
-                            <div class="bg-light rounded d-flex align-items-center justify-content-center" 
-                                 style="width: 50px; height: 50px;">
-                                <i class="fas fa-image text-muted"></i>
+                <canvas id="detectionChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-database"></i> 模型数据集信息
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="datasetChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 最近检测情况 -->
+{% if recent_records %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clock"></i> 最近检测情况
+                </h5>
+                <a href="{% url 'history' %}" class="btn btn-sm btn-outline-primary">
+                    查看全部
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for record in recent_records %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card border">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="flex-shrink-0">
+                                        {% if record.result_image %}
+                                            <img src="{{ record.result_image.url }}"
+                                                 class="rounded" width="60" height="60"
+                                                 style="object-fit: cover;">
+                                        {% else %}
+                                            <div class="bg-light rounded d-flex align-items-center justify-content-center"
+                                                 style="width: 60px; height: 60px;">
+                                                <i class="fas fa-image text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-grow-1 ms-3">
+                                        <div class="fw-bold">{{ record.total_detections }} 个检测</div>
+                                        <small class="text-muted">{{ record.upload_time|date:"m-d H:i" }}</small>
+                                    </div>
+                                </div>
+                                <div class="row text-center">
+                                    <div class="col-4">
+                                        <small class="text-success">{{ record.with_mask_count }}</small>
+                                        <br><small class="text-muted">正确</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-danger">{{ record.without_mask_count }}</small>
+                                        <br><small class="text-muted">未戴</small>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-warning">{{ record.incorrect_mask_count }}</small>
+                                        <br><small class="text-muted">错误</small>
+                                    </div>
+                                </div>
+                                <div class="d-grid mt-2">
+                                    <a href="{% url 'detection_result' record.id %}"
+                                       class="btn btn-sm btn-outline-primary">查看详情</a>
+                                </div>
                             </div>
-                        {% endif %}
+                        </div>
                     </div>
-                    <div class="flex-grow-1 ms-3">
-                        <div class="fw-bold">{{ record.total_detections }} 个检测</div>
-                        <small class="text-muted">{{ record.upload_time|date:"m-d H:i" }}</small>
-                    </div>
-                    <div class="flex-shrink-0">
-                        <a href="{% url 'detection_result' record.id %}" 
-                           class="btn btn-sm btn-outline-primary">查看</a>
-                    </div>
-                </div>
-                {% endfor %}
-                
-                <div class="d-grid">
-                    <a href="{% url 'history' %}" class="btn btn-sm btn-outline-secondary">
-                        查看全部历史
-                    </a>
+                    {% endfor %}
                 </div>
             </div>
         </div>
-        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- 系统信息 -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> 系统信息
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <strong>AI模型:</strong><br>
+                        <span class="text-muted">YOLO11</span>
+                    </div>
+                    <div class="col-6">
+                        <strong>检测类别:</strong><br>
+                        <span class="text-muted">3种</span>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Django版本:</strong><br>
+                        <span class="text-muted">{{ django_version }}</span>
+                    </div>
+                    <div class="col-6">
+                        <strong>Python版本:</strong><br>
+                        <span class="text-muted">{{ python_version }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tags"></i> 检测类别说明
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <span class="badge bg-success me-2">✓</span>
+                    <strong>正确戴口罩</strong>
+                    <br><small class="text-muted">口罩正确覆盖口鼻部位</small>
+                </div>
+                <div class="mb-3">
+                    <span class="badge bg-danger me-2">✗</span>
+                    <strong>未戴口罩</strong>
+                    <br><small class="text-muted">未佩戴任何口罩</small>
+                </div>
+                <div class="mb-3">
+                    <span class="badge bg-warning me-2">⚠</span>
+                    <strong>错误戴口罩</strong>
+                    <br><small class="text-muted">口罩佩戴不规范</small>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 $(document).ready(function() {
-    const uploadArea = $('#uploadArea');
-    const fileInput = $('#imageInput');
-    const imagePreview = $('#imagePreview');
-    const previewImg = $('#previewImg');
-    const uploadForm = $('#uploadForm');
-    const submitBtn = $('#submitBtn');
-    const progressContainer = $('.progress-container');
-    
-    // 拖拽上传功能
-    uploadArea.on('dragover', function(e) {
-        e.preventDefault();
-        $(this).addClass('dragover');
-    });
-    
-    uploadArea.on('dragleave', function(e) {
-        e.preventDefault();
-        $(this).removeClass('dragover');
-    });
-    
-    uploadArea.on('drop', function(e) {
-        e.preventDefault();
-        $(this).removeClass('dragover');
-        
-        const files = e.originalEvent.dataTransfer.files;
-        if (files.length > 0) {
-            fileInput[0].files = files;
-            previewImage(files[0]);
-        }
-    });
-    
-    // 点击上传区域
-    uploadArea.on('click', function() {
-        fileInput.click();
-    });
-    
-    // 文件选择变化
-    fileInput.on('change', function() {
-        const file = this.files[0];
-        if (file) {
-            previewImage(file);
-        }
-    });
-    
-    // 图片预览
-    function previewImage(file) {
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                previewImg.attr('src', e.target.result);
-                imagePreview.show();
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-    
-    // 表单提交
-    uploadForm.on('submit', function() {
-        if (!fileInput[0].files.length) {
-            alert('请先选择要检测的图片');
-            return false;
-        }
-        
-        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 检测中...');
-        progressContainer.show();
-        
-        // 模拟进度条
-        let progress = 0;
-        const progressBar = $('.progress-bar');
-        const progressText = $('#progressText');
-        
-        const interval = setInterval(function() {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            
-            progressBar.css('width', progress + '%');
-            
-            if (progress < 30) {
-                progressText.text('正在上传图片...');
-            } else if (progress < 60) {
-                progressText.text('正在加载AI模型...');
-            } else {
-                progressText.text('正在进行检测分析...');
+    // 检测结果分布饼状图
+    const detectionCtx = document.getElementById('detectionChart').getContext('2d');
+    new Chart(detectionCtx, {
+        type: 'pie',
+        data: {
+            labels: ['正确戴口罩', '未戴口罩', '错误戴口罩'],
+            datasets: [{
+                data: [{{ stats.with_mask_count }}, {{ stats.without_mask_count }}, {{ stats.incorrect_mask_count }}],
+                backgroundColor: [
+                    '#28a745',
+                    '#dc3545',
+                    '#ffc107'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
             }
-        }, 500);
-        
-        // 清理定时器（实际提交后会跳转页面）
-        setTimeout(function() {
-            clearInterval(interval);
-        }, 30000);
+        }
+    });
+
+    // 模型数据集信息饼状图（示例数据）
+    const datasetCtx = document.getElementById('datasetChart').getContext('2d');
+    new Chart(datasetCtx, {
+        type: 'pie',
+        data: {
+            labels: ['训练集', '验证集', '测试集'],
+            datasets: [{
+                data: [70, 20, 10],
+                backgroundColor: [
+                    '#007bff',
+                    '#17a2b8',
+                    '#6c757d'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
     });
 });
 </script>

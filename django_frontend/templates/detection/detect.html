@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 上传区域 -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-upload"></i> 上传图片进行口罩检测
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" action="{% url 'upload_and_detect' %}" id="uploadForm">
+                    {% csrf_token %}
+                    
+                    <!-- 拖拽上传区域 -->
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                        <h5>拖拽图片到此处或点击选择文件</h5>
+                        <p class="text-muted">支持 JPG, PNG, JPEG, BMP 格式，最大 10MB</p>
+                        {{ form.original_image }}
+                    </div>
+                    
+                    <!-- 图片预览 -->
+                    <div id="imagePreview" class="mt-3" style="display: none;">
+                        <img id="previewImg" class="preview-image" alt="预览图片">
+                    </div>
+                    
+                    <!-- 检测参数 -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.model_name.id_for_label }}" class="form-label">
+                                    {{ form.model_name.label }}
+                                    <a href="{% url 'model_management' %}" class="btn btn-sm btn-outline-info ms-2">
+                                        <i class="fas fa-cogs"></i> 管理模型
+                                    </a>
+                                </label>
+                                {{ form.model_name }}
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle"></i>
+                                    只显示实际存在的模型文件
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.image_size.id_for_label }}" class="form-label">
+                                    {{ form.image_size.label }}
+                                </label>
+                                {{ form.image_size }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.confidence_threshold.id_for_label }}" class="form-label">
+                                    {{ form.confidence_threshold.label }}
+                                </label>
+                                {{ form.confidence_threshold }}
+                                <div class="form-text">{{ form.confidence_threshold.help_text }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.iou_threshold.id_for_label }}" class="form-label">
+                                    {{ form.iou_threshold.label }}
+                                </label>
+                                {{ form.iou_threshold }}
+                                <div class="form-text">{{ form.iou_threshold.help_text }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 提交按钮 -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="fas fa-search"></i> 开始检测
+                        </button>
+                    </div>
+                    
+                    <!-- 进度条 -->
+                    <div class="progress-container mt-3">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-center mt-2" id="progressText">正在处理...</p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 侧边栏 -->
+    <div class="col-lg-4">
+        <!-- 检测说明 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> 检测说明
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6><i class="fas fa-upload text-primary"></i> 上传要求</h6>
+                    <ul class="small text-muted">
+                        <li>支持JPG、PNG、JPEG、BMP格式</li>
+                        <li>文件大小不超过10MB</li>
+                        <li>建议图片清晰度较高</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-3">
+                    <h6><i class="fas fa-cogs text-success"></i> 参数调整</h6>
+                    <ul class="small text-muted">
+                        <li>置信度：检测结果的可信程度</li>
+                        <li>IOU阈值：重叠检测框的过滤</li>
+                        <li>图像尺寸：影响检测精度和速度</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-3">
+                    <h6><i class="fas fa-eye text-info"></i> 检测类别</h6>
+                    <div class="mb-2">
+                        <span class="badge bg-success me-2">✓</span>
+                        <small>正确戴口罩</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="badge bg-danger me-2">✗</span>
+                        <small>未戴口罩</small>
+                    </div>
+                    <div class="mb-2">
+                        <span class="badge bg-warning me-2">⚠</span>
+                        <small>错误戴口罩</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 最近检测记录 -->
+        {% if recent_records %}
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-clock"></i> 最近检测
+                </h6>
+            </div>
+            <div class="card-body">
+                {% for record in recent_records %}
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-shrink-0">
+                        {% if record.result_image %}
+                            <img src="{{ record.result_image.url }}" 
+                                 class="rounded" width="50" height="50" 
+                                 style="object-fit: cover;">
+                        {% else %}
+                            <div class="bg-light rounded d-flex align-items-center justify-content-center" 
+                                 style="width: 50px; height: 50px;">
+                                <i class="fas fa-image text-muted"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="fw-bold">{{ record.total_detections }} 个检测</div>
+                        <small class="text-muted">{{ record.upload_time|date:"m-d H:i" }}</small>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <a href="{% url 'detection_result' record.id %}" 
+                           class="btn btn-sm btn-outline-primary">查看</a>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <div class="d-grid">
+                    <a href="{% url 'history' %}" class="btn btn-sm btn-outline-secondary">
+                        查看全部历史
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    const uploadArea = $('#uploadArea');
+    const fileInput = $('#imageInput');
+    const imagePreview = $('#imagePreview');
+    const previewImg = $('#previewImg');
+    const uploadForm = $('#uploadForm');
+    const submitBtn = $('#submitBtn');
+    const progressContainer = $('.progress-container');
+    
+    // 拖拽上传功能
+    uploadArea.on('dragover', function(e) {
+        e.preventDefault();
+        $(this).addClass('dragover');
+    });
+    
+    uploadArea.on('dragleave', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+    });
+    
+    uploadArea.on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+        
+        const files = e.originalEvent.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput[0].files = files;
+            previewImage(files[0]);
+        }
+    });
+    
+    // 点击上传区域
+    uploadArea.on('click', function() {
+        fileInput.click();
+    });
+    
+    // 文件选择变化
+    fileInput.on('change', function() {
+        const file = this.files[0];
+        if (file) {
+            previewImage(file);
+        }
+    });
+    
+    // 图片预览
+    function previewImage(file) {
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.attr('src', e.target.result);
+                imagePreview.show();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+    
+    // 表单提交
+    uploadForm.on('submit', function() {
+        if (!fileInput[0].files.length) {
+            alert('请先选择要检测的图片');
+            return false;
+        }
+        
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 检测中...');
+        progressContainer.show();
+        
+        // 模拟进度条
+        let progress = 0;
+        const progressBar = $('.progress-bar');
+        const progressText = $('#progressText');
+        
+        const interval = setInterval(function() {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            
+            progressBar.css('width', progress + '%');
+            
+            if (progress < 30) {
+                progressText.text('正在上传图片...');
+            } else if (progress < 60) {
+                progressText.text('正在加载AI模型...');
+            } else {
+                progressText.text('正在进行检测分析...');
+            }
+        }, 500);
+        
+        // 清理定时器（实际提交后会跳转页面）
+        setTimeout(function() {
+            clearInterval(interval);
+        }, 30000);
+    });
+});
+</script>
+{% endblock %}

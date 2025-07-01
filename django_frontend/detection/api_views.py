@@ -224,17 +224,36 @@ def api_delete_record(request, record_id):
     """API: 删除检测记录"""
     try:
         record = get_object_or_404(DetectionRecord, id=record_id)
-        
+
         # 删除相关文件
         if record.original_image:
             record.original_image.delete()
         if record.result_image:
             record.result_image.delete()
-        
+
         record.delete()
-        
+
         return JsonResponse({'success': True, 'message': '记录删除成功'})
-        
+
     except Exception as e:
         logger.error(f"删除记录失败: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_clear_cache(request):
+    """API: 清理缓存"""
+    try:
+        # 清理session中的默认参数
+        if 'default_params' in request.session:
+            del request.session['default_params']
+
+        # 可以在这里添加其他缓存清理逻辑
+        # 例如：清理临时文件、重置配置等
+
+        return JsonResponse({'success': True, 'message': '缓存清理成功'})
+
+    except Exception as e:
+        logger.error(f"清理缓存失败: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)

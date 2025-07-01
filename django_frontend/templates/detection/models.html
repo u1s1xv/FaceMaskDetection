@@ -20,7 +20,7 @@
             <div class="col-md-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <h4 class="text-primary">{{ available_models|length }}</h4>
+                        <h4 class="text-primary">{{ stats.total_files }}</h4>
                         <small class="text-muted">可用模型文件</small>
                     </div>
                 </div>
@@ -28,7 +28,7 @@
             <div class="col-md-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <h4 class="text-success">{{ model_status|length }}</h4>
+                        <h4 class="text-success">{{ stats.total_configured }}</h4>
                         <small class="text-muted">已配置模型</small>
                     </div>
                 </div>
@@ -36,7 +36,7 @@
             <div class="col-md-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <h4 class="text-warning">{{ orphan_models|length }}</h4>
+                        <h4 class="text-warning">{{ stats.total_orphan }}</h4>
                         <small class="text-muted">未配置模型</small>
                     </div>
                 </div>
@@ -44,11 +44,7 @@
             <div class="col-md-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <h4 class="text-info">
-                            {% for status in model_status %}
-                                {% if status.config.is_active and status.file_exists %}1{% endif %}
-                            {% empty %}0{% endfor %}
-                        </h4>
+                        <h4 class="text-info">{{ stats.total_active }}</h4>
                         <small class="text-muted">当前激活</small>
                     </div>
                 </div>
@@ -60,7 +56,7 @@
             <div class="card-header">
                 <h5 class="card-title mb-0">
                     <i class="fas fa-file-archive"></i> 可用模型文件
-                    <span class="badge bg-primary ms-2">{{ available_models|length }}</span>
+                    <span class="badge bg-primary ms-2">{{ stats.total_files }}</span>
                 </h5>
             </div>
             <div class="card-body">
@@ -87,21 +83,11 @@
                                 <td>{{ model.description }}</td>
                                 <td>{{ model.size }} MB</td>
                                 <td>
-                                    {% for status in model_status %}
-                                        {% if status.config.name == model.name %}
-                                            {% if status.config.is_active %}
-                                                <span class="badge bg-success">已激活</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary">已配置</span>
-                                            {% endif %}
-                                        {% endif %}
-                                    {% empty %}
-                                        {% if model.name in orphan_models|map:"name" %}
-                                            <span class="badge bg-warning">未配置</span>
-                                        {% endif %}
-                                    {% endfor %}
-                                    
-                                    {% if model.name not in model_status|map:"config.name" and model in orphan_models %}
+                                    {% if model.config_status == 'active' %}
+                                        <span class="badge bg-success">已激活</span>
+                                    {% elif model.config_status == 'configured' %}
+                                        <span class="badge bg-secondary">已配置</span>
+                                    {% else %}
                                         <span class="badge bg-warning">未配置</span>
                                     {% endif %}
                                 </td>
