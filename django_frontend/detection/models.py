@@ -168,6 +168,104 @@ class ModelConfig(models.Model):
         verbose_name = "模型配置"
         verbose_name_plural = "模型配置"
         ordering = ['-created_time']
-    
+
     def __str__(self):
         return f"{self.name} ({'启用' if self.is_active else '禁用'})"
+
+
+class LLMAnalysisRecord(models.Model):
+    """大模型分析记录模型"""
+
+    # 关联的检测记录
+    detection_record = models.ForeignKey(
+        DetectionRecord,
+        on_delete=models.CASCADE,
+        related_name='llm_analyses',
+        verbose_name="检测记录"
+    )
+
+    # 用户输入
+    user_prompt = models.TextField(
+        verbose_name="用户提示词",
+        help_text="用户输入的问题或分析需求"
+    )
+
+    # LLM响应
+    llm_response = models.TextField(
+        verbose_name="LLM响应",
+        help_text="大模型返回的分析结果"
+    )
+
+    # 元数据
+    created_time = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="创建时间"
+    )
+
+    # API调用信息
+    api_provider = models.CharField(
+        max_length=50,
+        default="openai",
+        verbose_name="API提供商",
+        help_text="使用的大模型API提供商"
+    )
+
+    model_name = models.CharField(
+        max_length=100,
+        default="gpt-3.5-turbo",
+        verbose_name="模型名称",
+        help_text="使用的具体模型名称"
+    )
+
+    # 性能指标
+    response_time = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name="响应时间(秒)",
+        help_text="API调用的响应时间"
+    )
+
+    token_usage = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="Token使用量",
+        help_text="API调用的token消耗统计"
+    )
+
+    # 状态信息
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', '处理中'),
+            ('completed', '已完成'),
+            ('failed', '失败'),
+        ],
+        default='pending',
+        verbose_name="状态"
+    )
+
+    error_message = models.TextField(
+        blank=True,
+        verbose_name="错误信息",
+        help_text="如果失败，记录错误详情"
+    )
+
+    class Meta:
+        verbose_name = "LLM分析记录"
+        verbose_name_plural = "LLM分析记录"
+        ordering = ['-created_time']
+
+    def __str__(self):
+        return f"分析#{self.id} - 检测#{self.detection_record.id} ({self.get_status_display()})"
+
+    @property
+    def prompt_preview(self):
+        """返回提示词的预览（前50个字符）"""
+        return self.user_prompt[:50] + "..." if len(self.user_prompt) > 50 else self.user_prompt
+
+    @property
+    def response_preview(self):
+        """返回响应的预览（前100个字符）"""
+        if not self.llm_response:
+            return "无响应"
+        return self.llm_response[:100] + "..." if len(self.llm_response) > 100 else self.llm_response

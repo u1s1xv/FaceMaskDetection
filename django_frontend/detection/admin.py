@@ -2,7 +2,7 @@
 Django管理后台配置
 """
 from django.contrib import admin
-from .models import DetectionRecord, ModelConfig
+from .models import DetectionRecord, ModelConfig, LLMAnalysisRecord
 
 
 @admin.register(DetectionRecord)
@@ -81,3 +81,63 @@ class ModelConfigAdmin(admin.ModelAdmin):
             'fields': ('accuracy', 'inference_speed', 'model_size')
         }),
     )
+
+
+@admin.register(LLMAnalysisRecord)
+class LLMAnalysisRecordAdmin(admin.ModelAdmin):
+    """LLM分析记录管理"""
+
+    list_display = (
+        'id',
+        'detection_record',
+        'prompt_preview',
+        'status',
+        'api_provider',
+        'model_name',
+        'response_time',
+        'created_time'
+    )
+
+    list_filter = (
+        'status',
+        'api_provider',
+        'model_name',
+        'created_time'
+    )
+
+    search_fields = (
+        'user_prompt',
+        'llm_response',
+        'detection_record__id'
+    )
+
+    readonly_fields = (
+        'created_time',
+        'response_time',
+        'token_usage'
+    )
+
+    list_per_page = 20
+
+    fieldsets = (
+        ('关联信息', {
+            'fields': ('detection_record',)
+        }),
+        ('用户输入', {
+            'fields': ('user_prompt',)
+        }),
+        ('LLM响应', {
+            'fields': ('llm_response', 'status', 'error_message')
+        }),
+        ('API信息', {
+            'fields': ('api_provider', 'model_name', 'response_time', 'token_usage')
+        }),
+        ('时间信息', {
+            'fields': ('created_time',)
+        }),
+    )
+
+    def prompt_preview(self, obj):
+        """显示提示词预览"""
+        return obj.prompt_preview
+    prompt_preview.short_description = '提示词预览'

@@ -145,3 +145,11 @@ YOLO_SCRIPTS_DIR = YOLO_SERVER_ROOT / 'scripts'
 # 支持的图片格式
 ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.bmp']
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
+
+# LLM API配置
+LLM_SERVICE_TYPE = 'mock'  # 可选: 'openai', 'mock'
+LLM_API_KEY = ''  # OpenAI API密钥，生产环境请使用环境变量
+LLM_API_BASE_URL = ''  # API基础URL，留空使用默认
+LLM_MODEL_NAME = 'gpt-3.5-turbo'  # 使用的模型名称
+LLM_API_TIMEOUT = 30  # API超时时间（秒）
+LLM_MAX_TOKENS = 1000  # 最大token数量

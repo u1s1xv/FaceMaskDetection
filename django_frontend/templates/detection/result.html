@@ -193,6 +193,118 @@
     </div>
 </div>
 
+<!-- 大模型分析板块 -->
+<div class="llm-analysis-section" data-record-id="{{ record.id }}">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-brain"></i> AI智能分析
+                        <small class="text-muted ms-2">基于检测结果的深度分析</small>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 消息提示区域 -->
+                    <div class="llm-messages"></div>
+
+                    <!-- 输入区域 -->
+                    <div class="llm-input-area">
+                        <div class="row">
+                            <div class="col-12">
+                                <label for="llmPrompt" class="form-label fw-bold">
+                                    <i class="fas fa-comment-dots"></i> 请输入您的问题或分析需求
+                                </label>
+                                <textarea
+                                    id="llmPrompt"
+                                    class="form-control llm-prompt-input"
+                                    rows="3"
+                                    placeholder="例如：请分析这次检测的结果，给出口罩佩戴情况的总结和建议..."
+                                    maxlength="1000"></textarea>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle"></i>
+                                    支持Ctrl+Enter快速发送，最多1000字符
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-primary llm-submit-btn">
+                                        <i class="fas fa-paper-plane me-2"></i>发送分析请求
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary llm-clear-btn">
+                                        <i class="fas fa-eraser me-2"></i>清除内容
+                                    </button>
+                                    <div class="ms-auto">
+                                        <small class="text-muted">
+                                            <i class="fas fa-robot me-1"></i>
+                                            由AI大模型提供分析支持
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 加载状态 -->
+                    <div class="llm-loading">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">分析中...</span>
+                        </div>
+                        <div class="mt-3">
+                            <h6>AI正在分析检测结果...</h6>
+                            <p class="text-muted mb-0">请稍候，这可能需要几秒钟时间</p>
+                        </div>
+                    </div>
+
+                    <!-- 响应区域 -->
+                    <div class="llm-response-area d-none">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">
+                                <i class="fas fa-lightbulb text-warning"></i> AI分析结果
+                            </h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary llm-copy-btn">
+                                <i class="fas fa-copy me-1"></i>复制
+                            </button>
+                        </div>
+                        <div class="llm-response-content"></div>
+                    </div>
+
+                    <!-- 快捷提示 -->
+                    <div class="mt-3">
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="text-muted mb-2">
+                                    <i class="fas fa-magic"></i> 快捷提示词
+                                </h6>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-info quick-prompt"
+                                            data-prompt="请分析这次检测的整体情况，包括口罩佩戴合规率和主要问题">
+                                        整体分析
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-info quick-prompt"
+                                            data-prompt="基于检测结果，给出改进口罩佩戴情况的具体建议">
+                                        改进建议
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-info quick-prompt"
+                                            data-prompt="请解释检测结果中各项数据的含义和重要性">
+                                        数据解读
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-info quick-prompt"
+                                            data-prompt="对比理想的口罩佩戴标准，评估当前检测结果">
+                                        标准对比
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 详细检测数据模态框 -->
 <div class="modal fade" id="detailsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
