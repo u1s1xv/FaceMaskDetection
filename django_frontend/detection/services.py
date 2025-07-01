@@ -13,8 +13,11 @@ from django.core.files.base import ContentFile
 from PIL import Image
 import cv2
 import numpy as np
+import re
 
 logger = logging.getLogger(__name__)
+
+
 
 
 class YOLOInferenceService:
@@ -157,9 +160,15 @@ class YOLOInferenceService:
                 logger.error(f"YOLO推理失败: {result.stderr}")
                 raise RuntimeError(f"YOLO推理失败: {result.stderr}")
             
+            exp_dirs = [d for d in output_dir.iterdir() if d.is_dir() and re.match(r"exp\d*$", d.name)]
+            if not exp_dirs:
+                raise RuntimeError("未找到推理输出exp目录")
+            
+            latest_exp_dir = max(exp_dirs, key=lambda d: d.stat().st_mtime)
+
             # 解析结果
             inference_result = self._parse_inference_results(
-                output_dir / 'exp', 
+                latest_exp_dir,
                 processing_time
             )
             

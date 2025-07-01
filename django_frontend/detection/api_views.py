@@ -15,6 +15,25 @@ from datetime import datetime
 from .models import DetectionRecord, ModelConfig
 from .services import YOLOInferenceService
 
+# 大模型API配置 - 直接在这里定义，避免导入问题
+SILICONFLOW_CONFIG = {
+    'api_key': '***REMOVED-API-KEY***',  # 请替换为您的实际API密钥
+    'base_url': 'https://api.siliconflow.cn/v1/chat/completions',
+    'timeout': 30,
+    'max_tokens': 1000,
+    'temperature': 0.7
+}
+
+MODEL_MAPPING = {
+    'gpt-4': 'Qwen/QwQ-32B',
+    'gpt-3.5-turbo': 'Qwen/Qwen2.5-7B-Instruct',
+    'claude-3-sonnet': 'Qwen/QwQ-32B',
+    'gemini-pro': 'Qwen/QwQ-32B'
+}
+
+DEFAULT_MODEL = 'Qwen/QwQ-32B'
+SYSTEM_PROMPT = "你是一个专业的口罩检测分析专家，请用中文回答，语言专业且易懂。"
+
 logger = logging.getLogger(__name__)
 
 
@@ -348,11 +367,84 @@ def build_analysis_context(detection_data, user_prompt):
 def call_llm_api(model, prompt):
     """调用大模型API"""
     try:
-        # 这里是一个示例实现，您需要根据实际使用的大模型API进行调整
-        # 目前返回模拟的分析结果
+        # 获取实际的模型名称
+        actual_model = MODEL_MAPPING.get(model, DEFAULT_MODEL)
 
-        # 模拟API调用延迟
-        time.sleep(2)
+        # 构建API请求
+        payload = {
+            "model": actual_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "max_tokens": SILICONFLOW_CONFIG['max_tokens'],
+            "temperature": SILICONFLOW_CONFIG['temperature']
+        }
+
+        headers = {
+            "Authorization": f"Bearer {SILICONFLOW_CONFIG['api_key']}",
+            "Content-Type": "application/json"
+        }
+
+        # 发送API请求
+        logger.info(f"调用SiliconFlow API - 模型: {actual_model}")
+        response = requests.post(
+            SILICONFLOW_CONFIG['base_url'],
+            json=payload,
+            headers=headers,
+            timeout=SILICONFLOW_CONFIG['timeout']
+        )
+
+        # 检查响应状态
+        if response.status_code == 200:
+            response_data = response.json()
+
+            # 提取分析结果
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                analysis_content = response_data['choices'][0]['message']['content']
+
+                logger.info(f"SiliconFlow API调用成功 - 模型: {actual_model}")
+                return {
+                    'success': True,
+                    'content': analysis_content,
+                    'model_used': actual_model,
+                    'api_provider': 'SiliconFlow'
+                }
+            else:
+                logger.error(f"SiliconFlow API响应格式错误: {response_data}")
+                return {
+                    'success': False,
+                    'error': 'API响应格式错误'
+                }
+        else:
+            # API调用失败，使用备用的模拟结果
+            logger.warning(f"SiliconFlow API调用失败 (状态码: {response.status_code})，使用备用模拟结果")
+            logger.warning(f"错误响应: {response.text}")
+
+            # 返回模拟结果作为备用
+            return call_fallback_analysis(model, prompt)
+
+    except requests.exceptions.Timeout:
+        logger.error("SiliconFlow API调用超时，使用备用模拟结果")
+        return call_fallback_analysis(model, prompt)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SiliconFlow API网络错误: {str(e)}，使用备用模拟结果")
+        return call_fallback_analysis(model, prompt)
+    except Exception as e:
+        logger.error(f"调用LLM API失败: {str(e)}，使用备用模拟结果")
+        return call_fallback_analysis(model, prompt)
+
+
+def call_fallback_analysis(model, prompt):
+    """备用分析方法 - 当API调用失败时使用模拟结果"""
+    try:
+        logger.info(f"使用备用分析方法 - 模型: {model}")
 
         # 根据不同模型返回不同的模拟结果
         if 'gpt' in model.lower():
@@ -366,26 +458,16 @@ def call_llm_api(model, prompt):
 
         return {
             'success': True,
-            'content': analysis
+            'content': analysis,
+            'model_used': f'{model} (模拟)',
+            'api_provider': 'Fallback'
         }
 
-        # 实际API调用示例（需要配置API密钥）
-        """
-        if model.startswith('gpt'):
-            return call_openai_api(model, prompt)
-        elif model.startswith('claude'):
-            return call_claude_api(model, prompt)
-        elif model.startswith('gemini'):
-            return call_gemini_api(model, prompt)
-        else:
-            return {'success': False, 'error': f'不支持的模型: {model}'}
-        """
-
     except Exception as e:
-        logger.error(f"调用LLM API失败: {str(e)}")
+        logger.error(f"备用分析方法也失败: {str(e)}")
         return {
             'success': False,
-            'error': f'API调用失败: {str(e)}'
+            'error': f'分析失败: {str(e)}'
         }
 
 

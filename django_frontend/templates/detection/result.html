@@ -420,7 +420,7 @@ function startLLMAnalysis() {
         timeout: 60000, // 60秒超时
         success: function(response) {
             if (response.success) {
-                displayLLMResult(response.analysis);
+                displayLLMResult(response.analysis, response.model_used, response.api_provider);
                 llmResultContent = response.analysis;
             } else {
                 displayLLMError(response.error || '分析失败，请重试');
@@ -462,7 +462,7 @@ function setLLMLoadingState(loading) {
 }
 
 // 显示LLM分析结果
-function displayLLMResult(analysis) {
+function displayLLMResult(analysis, modelUsed, apiProvider) {
     const $resultArea = $('#llmResultArea');
     const $copyBtn = $('#copyLLMResult');
     const $downloadBtn = $('#downloadLLMResult');
@@ -470,12 +470,28 @@ function displayLLMResult(analysis) {
     // 格式化分析结果
     const formattedAnalysis = formatAnalysisResult(analysis);
 
+    // 构建模型信息显示
+    let modelInfo = '';
+    if (modelUsed && apiProvider) {
+        const providerIcon = apiProvider === 'SiliconFlow' ? 'fas fa-microchip' : 'fas fa-robot';
+        const providerColor = apiProvider === 'SiliconFlow' ? 'text-primary' : 'text-info';
+        modelInfo = `
+            <div class="mb-2">
+                <small class="text-muted">
+                    <i class="${providerIcon} ${providerColor}"></i>
+                    ${apiProvider} - ${modelUsed}
+                </small>
+            </div>
+        `;
+    }
+
     $resultArea.html(`
         <div class="llm-result-success">
             <div class="d-flex align-items-center mb-2">
                 <i class="fas fa-check-circle text-success me-2"></i>
                 <strong>AI分析完成</strong>
             </div>
+            ${modelInfo}
             <div class="llm-result-content">${formattedAnalysis}</div>
         </div>
     `).addClass('has-content');
