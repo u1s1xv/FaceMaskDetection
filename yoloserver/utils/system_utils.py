@@ -13,11 +13,14 @@ import time
 import logging
 import json
 import importlib.metadata  # Python 3.8+ 获取包版本，推荐
+import os
+import sys
 
 import torch
 import cpuinfo
 import ultralytics
 from functools import lru_cache
+
 # 尝试导入ONNX库，如果不存在则设为None，避免程序崩溃
 try:
     import onnx

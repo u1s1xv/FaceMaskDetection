@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=2,help="训练轮数")
     parser.add_argument("--imgsz", type=int, default=640,help="训练图片尺寸")
     parser.add_argument("--device", type=str, default="0",help="训练设备")
-    parser.add_argument("--weights", type=str, default= "yolo11n-seg.pt",help="预训练模型路径")
+    parser.add_argument("--weights", type=str, default= "yolo11n.pt",help="预训练模型路径")
     parser.add_argument("--workers",type=int, default=8,help="训练数据加载线程数" )
     # 自定义参数
     parser.add_argument("--use_yaml", type=bool, default=True,help="使用yaml配置文件" )

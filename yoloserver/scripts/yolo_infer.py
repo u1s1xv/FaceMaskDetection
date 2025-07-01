@@ -35,9 +35,9 @@ from paths import YOLOSERVER_ROOT,LOGS_DIR,CHECKPOINTS_DIR
 def parse_args():
     parser = argparse.ArgumentParser(description="YOLO Inference")
     parser.add_argument("--weights", type=str,
-            default=r"C:\Users\Matri\Desktop\BTD\yoloserver\models\checkpoints\train2_20250626-164018_yolo11m-seg_best.pt", help="模型权重信息路径")
+            default=r"C:\FaceMaskDetection\yoloserver\models\checkpoints\train3_20250701-105710_yolov12n_best.pt", help="模型权重信息路径")
     parser.add_argument("--source", type=str,
-            default=r"C:\Users\Matri\Desktop\BTD\yoloserver\data\test\images", help="推理数据源")
+            default=r"C:\FaceMaskDetection\yoloserver\data\raw\images", help="推理数据源")
     parser.add_argument("--imgsz", type=int, default=640, help="推理图片尺寸")
     parser.add_argument("--conf", type=float, default=0.25, help="置信度阈值")
     parser.add_argument("--iou", type=float, default=0.45, help="IOU阈值")
