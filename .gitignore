@@ -20,4 +20,13 @@ yoloserver/logs/*
 yoloserver/configs/*
 !yoloserver/configs/.keep
 
+# Runs directories
 yoloserver/runs/*
+!yoloserver/runs/.keep
+
+# Django Media directories
+django_frontend/media/*
+!django_frontend/media/.keep
+
+# Django sqlite database
+django_frontend/db.sqlite3
