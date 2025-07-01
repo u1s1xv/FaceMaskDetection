@@ -2,9 +2,12 @@
 表单定义
 """
 from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import os
+import re
 from .models import DetectionRecord, ModelConfig
 
 
@@ -250,3 +253,151 @@ class DetectionParametersForm(forms.Form):
         # 按文件名排序
         model_choices.sort(key=lambda x: x[0])
         return model_choices
+
+
+class CustomUserCreationForm(UserCreationForm):
+    """自定义用户注册表单"""
+
+    email = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': '邮箱（可选）'
+        }),
+        help_text='可选，用于后续功能扩展'
+    )
+
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'password1', 'password2')
+        widgets = {
+            'username': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '用户名'
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # 自定义字段标签和帮助文本
+        self.fields['username'].label = '用户名'
+        self.fields['username'].help_text = '只允许数字和英文字母组合，3-150个字符'
+
+        self.fields['password1'].label = '密码'
+        self.fields['password1'].help_text = '至少6位，支持英文字母、数字、特殊符号'
+        self.fields['password1'].widget.attrs.update({
+            'class': 'form-control',
+            'placeholder': '密码'
+        })
+
+        self.fields['password2'].label = '确认密码'
+        self.fields['password2'].help_text = '请再次输入密码进行确认'
+        self.fields['password2'].widget.attrs.update({
+            'class': 'form-control',
+            'placeholder': '确认密码'
+        })
+
+    def clean_username(self):
+        """验证用户名格式"""
+        username = self.cleaned_data.get('username')
+
+        if not username:
+            raise ValidationError('用户名不能为空')
+
+        # 检查长度
+        if len(username) < 3:
+            raise ValidationError('用户名至少需要3个字符')
+
+        if len(username) > 150:
+            raise ValidationError('用户名不能超过150个字符')
+
+        # 检查字符组成：只允许数字和英文字母
+        if not re.match(r'^[a-zA-Z0-9]+$', username):
+            raise ValidationError('用户名只能包含英文字母和数字')
+
+        # 检查是否已存在
+        if User.objects.filter(username=username).exists():
+            raise ValidationError('该用户名已被使用')
+
+        return username
+
+    def clean_password1(self):
+        """验证密码格式"""
+        password1 = self.cleaned_data.get('password1')
+
+        if not password1:
+            raise ValidationError('密码不能为空')
+
+        # 检查长度
+        if len(password1) < 6:
+            raise ValidationError('密码至少需要6个字符')
+
+        # 检查字符组成：允许英文字母、数字、特殊符号
+        if not re.match(r'^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]+$', password1):
+            raise ValidationError('密码只能包含英文字母、数字和常见特殊符号')
+
+        return password1
+
+    def clean_email(self):
+        """验证邮箱格式"""
+        email = self.cleaned_data.get('email')
+
+        if email:
+            # 检查邮箱是否已被使用
+            if User.objects.filter(email=email).exists():
+                raise ValidationError('该邮箱已被使用')
+
+        return email
+
+
+class CustomLoginForm(forms.Form):
+    """自定义登录表单"""
+
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '用户名',
+            'autofocus': True
+        }),
+        label='用户名'
+    )
+
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': '密码'
+        }),
+        label='密码'
+    )
+
+    remember_me = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input'
+        }),
+        label='记住我'
+    )
+
+    def clean_username(self):
+        """清理用户名输入"""
+        username = self.cleaned_data.get('username', '').strip()
+
+        if not username:
+            raise ValidationError('请输入用户名')
+
+        # 基本格式验证
+        if not re.match(r'^[a-zA-Z0-9]+$', username):
+            raise ValidationError('用户名格式不正确')
+
+        return username
+
+    def clean_password(self):
+        """清理密码输入"""
+        password = self.cleaned_data.get('password', '')
+
+        if not password:
+            raise ValidationError('请输入密码')
+
+        return password

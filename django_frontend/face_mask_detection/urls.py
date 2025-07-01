@@ -18,10 +18,16 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import redirect
+
+def redirect_to_welcome(request):
+    """重定向到欢迎页面"""
+    return redirect('welcome')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('detection.urls')),
+    path('', redirect_to_welcome),  # 根路径重定向到欢迎页面
+    path('app/', include('detection.urls')),  # 应用路径
     path('api/', include('detection.api_urls')),
 ]
 

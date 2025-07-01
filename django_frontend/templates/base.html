@@ -75,46 +75,99 @@
             </button>
             
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}"
-                           href="{% url 'index' %}">
-                            <i class="fas fa-home"></i> 首页
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'detect' %}active{% endif %}"
-                           href="{% url 'detect' %}">
-                            <i class="fas fa-search"></i> 检测
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'history' %}active{% endif %}"
-                           href="{% url 'history' %}">
-                            <i class="fas fa-history"></i> 检测历史
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'model_management' %}active{% endif %}"
-                           href="{% url 'model_management' %}">
-                            <i class="fas fa-cogs"></i> 模型管理
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}"
-                           href="{% url 'settings' %}">
-                            <i class="fas fa-sliders-h"></i> 设置
-                        </a>
-                    </li>
-                </ul>
-                
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/admin/" target="_blank">
-                            <i class="fas fa-user-shield"></i> 管理后台
-                        </a>
-                    </li>
-                </ul>
+                {% if user.is_authenticated %}
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}"
+                               href="{% url 'index' %}">
+                                <i class="fas fa-home"></i> 首页
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'detect' %}active{% endif %}"
+                               href="{% url 'detect' %}">
+                                <i class="fas fa-search"></i> 检测
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'history' %}active{% endif %}"
+                               href="{% url 'history' %}">
+                                <i class="fas fa-history"></i> 检测历史
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'model_management' %}active{% endif %}"
+                               href="{% url 'model_management' %}">
+                                <i class="fas fa-cogs"></i> 模型管理
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'settings_view' %}active{% endif %}"
+                               href="{% url 'settings_view' %}">
+                                <i class="fas fa-sliders-h"></i> 设置
+                            </a>
+                        </li>
+                    </ul>
+
+                    <ul class="navbar-nav">
+                        <!-- 管理员专用菜单 -->
+                        {% if user.is_superuser %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button"
+                                   data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-user-shield"></i> 管理员
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="/admin/" target="_blank">
+                                        <i class="fas fa-cog"></i> 管理后台
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'index' %}?show_all=true">
+                                        <i class="fas fa-globe"></i> 查看全站数据
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'history' %}?show_all=true">
+                                        <i class="fas fa-list"></i> 全站检测历史
+                                    </a></li>
+                                </ul>
+                            </li>
+                        {% endif %}
+
+                        <!-- 用户菜单 -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                               data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user"></i> {{ user.username }}
+                                {% if user.is_superuser %}
+                                    <span class="badge bg-warning ms-1">管理员</span>
+                                {% endif %}
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'profile' %}">
+                                    <i class="fas fa-user-circle"></i> 个人资料
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'logout' %}"
+                                       onclick="return confirm('确定要退出登录吗？')">
+                                    <i class="fas fa-sign-out-alt"></i> 退出登录
+                                </a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                {% else %}
+                    <!-- 未登录用户显示登录链接 -->
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">
+                                <i class="fas fa-sign-in-alt"></i> 登录
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'register' %}">
+                                <i class="fas fa-user-plus"></i> 注册
+                            </a>
+                        </li>
+                    </ul>
+                {% endif %}
             </div>
         </div>
     </nav>

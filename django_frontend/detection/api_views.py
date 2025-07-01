@@ -4,8 +4,11 @@ API视图
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404
 from django.core.serializers import serialize
+from django.core.paginator import Paginator
+from django.db.models import Q
 import json
 import logging
 import requests
@@ -37,6 +40,7 @@ SYSTEM_PROMPT = "你是一个专业的口罩检测分析专家，请用中文回
 logger = logging.getLogger(__name__)
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_upload_detect(request):
@@ -44,15 +48,16 @@ def api_upload_detect(request):
     try:
         if 'image' not in request.FILES:
             return JsonResponse({'error': '没有上传图片'}, status=400)
-        
+
         image = request.FILES['image']
         model_name = request.POST.get('model_name', 'yolo11n-seg.pt')
         confidence = float(request.POST.get('confidence', 0.25))
         iou = float(request.POST.get('iou', 0.45))
         imgsz = int(request.POST.get('imgsz', 640))
-        
-        # 创建检测记录
+
+        # 创建检测记录，关联当前用户
         record = DetectionRecord.objects.create(
+            user=request.user,  # 关联当前用户
             original_image=image,
             model_name=model_name,
             confidence_threshold=confidence,
@@ -115,11 +120,16 @@ def api_upload_detect(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
 @require_http_methods(["GET"])
 def api_get_result(request, record_id):
     """API: 获取检测结果"""
     try:
-        record = get_object_or_404(DetectionRecord, id=record_id)
+        # 确保用户只能查看自己的记录，除非是管理员
+        if request.user.is_superuser:
+            record = get_object_or_404(DetectionRecord, id=record_id)
+        else:
+            record = get_object_or_404(DetectionRecord, id=record_id, user=request.user)
         
         return JsonResponse({
             'id': record.id,
@@ -146,6 +156,7 @@ def api_get_result(request, record_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
 @require_http_methods(["GET"])
 def api_get_models(request):
     """API: 获取可用模型列表"""
@@ -191,6 +202,7 @@ def api_get_models(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
 @require_http_methods(["GET"])
 def api_get_history(request):
     """API: 获取检测历史"""
@@ -198,8 +210,16 @@ def api_get_history(request):
         page = int(request.GET.get('page', 1))
         page_size = int(request.GET.get('page_size', 10))
         status_filter = request.GET.get('status', '')
-        
-        records = DetectionRecord.objects.all()
+
+        # 根据用户权限获取数据
+        if request.user.is_superuser:
+            show_all = request.GET.get('show_all', 'false') == 'true'
+            if show_all:
+                records = DetectionRecord.objects.all()
+            else:
+                records = DetectionRecord.objects.filter(user=request.user)
+        else:
+            records = DetectionRecord.objects.filter(user=request.user)
         
         if status_filter:
             records = records.filter(status=status_filter)
@@ -240,12 +260,17 @@ def api_get_history(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["DELETE"])
 def api_delete_record(request, record_id):
     """API: 删除检测记录"""
     try:
-        record = get_object_or_404(DetectionRecord, id=record_id)
+        # 确保用户只能删除自己的记录，除非是管理员
+        if request.user.is_superuser:
+            record = get_object_or_404(DetectionRecord, id=record_id)
+        else:
+            record = get_object_or_404(DetectionRecord, id=record_id, user=request.user)
 
         # 删除相关文件
         if record.original_image:
@@ -262,6 +287,7 @@ def api_delete_record(request, record_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_clear_cache(request):
@@ -281,6 +307,7 @@ def api_clear_cache(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_llm_analysis(request):

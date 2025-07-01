@@ -62,6 +62,21 @@
 
 <!-- 统计数据 -->
 <div class="row mb-4">
+    <div class="col-12 mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3>{{ stats_label }}</h3>
+            {% if is_superuser %}
+                <div class="btn-group" role="group">
+                    <a href="{% url 'index' %}" class="btn btn-sm {% if not show_all %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        我的数据
+                    </a>
+                    <a href="{% url 'index' %}?show_all=true" class="btn btn-sm {% if show_all %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        全站数据
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
     <div class="col-md-3">
         <div class="card bg-primary text-white">
             <div class="card-body text-center">
