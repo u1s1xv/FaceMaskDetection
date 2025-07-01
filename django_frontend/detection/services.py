@@ -159,9 +159,8 @@ class YOLOInferenceService:
             
             # 解析结果
             inference_result = self._parse_inference_results(
-                output_dir / 'exp',
-                processing_time,
-                input_image_path=image_path
+                output_dir / 'exp', 
+                processing_time
             )
             
             return inference_result
@@ -173,7 +172,7 @@ class YOLOInferenceService:
             logger.error(f"YOLO推理异常: {str(e)}")
             raise RuntimeError(f"推理失败: {str(e)}")
     
-    def _parse_inference_results(self, result_dir, processing_time, input_image_path=None):
+    def _parse_inference_results(self, result_dir, processing_time):
         """解析推理结果"""
         try:
             result_data = {
@@ -186,57 +185,18 @@ class YOLOInferenceService:
                 'result_image_path': None,
                 'beautified_image_path': None
             }
-
-            logger.info(f"解析推理结果目录: {result_dir}")
-
-            # 获取输入图片的基础文件名（不含扩展名）
-            input_basename = None
-            if input_image_path:
-                input_basename = Path(input_image_path).stem
-                logger.info(f"输入图片基础名称: {input_basename}")
-
-            # 查找结果图像 - 优先查找与输入文件名匹配的图片
-            result_images = list(result_dir.glob('*.jpg')) + list(result_dir.glob('*.png'))
-            if result_images:
-                if input_basename:
-                    # 尝试找到与输入文件名匹配的结果图片
-                    for img_file in result_images:
-                        if input_basename in img_file.stem:
-                            result_data['result_image_path'] = str(img_file)
-                            logger.info(f"找到匹配的结果图片: {img_file}")
-                            break
-
-                # 如果没找到匹配的，使用第一个图片
-                if not result_data['result_image_path']:
-                    result_data['result_image_path'] = str(result_images[0])
-                    logger.info(f"使用第一个结果图片: {result_images[0]}")
-
-            # 查找美化图像 - 优先查找与输入文件名匹配的图片
+            
+            # 查找结果图像
+            for img_file in result_dir.glob('*.jpg'):
+                result_data['result_image_path'] = str(img_file)
+                break
+            
+            # 查找美化图像
             beautified_dir = result_dir / 'beautified'
             if beautified_dir.exists():
-                if input_basename:
-                    # 尝试找到与输入文件名匹配的美化图片
-                    expected_filename = f"{input_basename}_result.png"
-                    beautified_image = beautified_dir / expected_filename
-                    if beautified_image.exists():
-                        result_data['beautified_image_path'] = str(beautified_image)
-                        logger.info(f"找到匹配的美化图片: {beautified_image}")
-                    else:
-                        # 如果没找到预期的文件名，查找包含输入文件名的图片
-                        for img_file in beautified_dir.glob('*.png'):
-                            if input_basename in img_file.stem:
-                                result_data['beautified_image_path'] = str(img_file)
-                                logger.info(f"找到相关的美化图片: {img_file}")
-                                break
-
-                # 如果仍然没找到，使用第一个可用的png文件
-                if not result_data['beautified_image_path']:
-                    png_files = list(beautified_dir.glob('*.png'))
-                    if png_files:
-                        result_data['beautified_image_path'] = str(png_files[0])
-                        logger.info(f"使用第一个美化图片: {png_files[0]}")
-            else:
-                logger.warning(f"美化图片目录不存在: {beautified_dir}")
+                for img_file in beautified_dir.glob('*.png'):
+                    result_data['beautified_image_path'] = str(img_file)
+                    break
             
             # 解析标签文件
             labels_dir = result_dir / 'labels'

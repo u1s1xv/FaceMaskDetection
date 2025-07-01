@@ -19,3 +19,5 @@ yoloserver/logs/*
 # Configs directories
 yoloserver/configs/*
 !yoloserver/configs/.keep
+
+yoloserver/runs/*

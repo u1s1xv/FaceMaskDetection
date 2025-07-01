@@ -59,6 +59,9 @@ def parse_args():
     parser.add_argument("--use-chinese-mapping", type=bool, default=False, help="启用中文映射")
     parser.add_argument("--use_yaml", type=bool, default=True, help="是否使用 YAML 配置")
 
+    # 添加输出路径参数，与Django前端兼容
+    parser.add_argument("--project", type=str, default=None, help="输出项目目录路径")
+    parser.add_argument("--name", type=str, default="exp", help="输出实验名称")
 
     return parser.parse_args()
 
@@ -199,6 +202,12 @@ def main():
         logger.info(f"{'摄像头' if source.isdigit() else '视频'}推理完成，结果已保存至: {save_dir or '未保存'}")
 
     else:
+        # 确定输出路径
+        if args.project:
+            project_path = Path(args.project)
+        else:
+            project_path = YOLOSERVER_ROOT / "runs" / "infer"
+
         results = model.predict(
             source=source,
             imgsz=args.imgsz,
@@ -209,8 +218,8 @@ def main():
             save_conf=args.save_conf,
             save_crop=args.save_crop,
             show=False,
-            project= YOLOSERVER_ROOT / "runs" / "infer",
-            name="exp",
+            project=project_path,
+            name=args.name,
         )
         # 美化输出
         save_dir = Path(results[0].save_dir)
