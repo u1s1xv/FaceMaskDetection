@@ -13,21 +13,20 @@ from .models import DetectionRecord, ModelConfig
 
 class ImageUploadForm(forms.ModelForm):
     """图片上传表单"""
-    
+
     class Meta:
         model = DetectionRecord
         fields = [
-            'original_image', 
-            'model_name', 
-            'confidence_threshold', 
-            'iou_threshold', 
+            'original_image',
+            'model_name',
+            'confidence_threshold',
+            'iou_threshold',
             'image_size'
         ]
         widgets = {
             'original_image': forms.FileInput(attrs={
                 'class': 'form-control',
-                'accept': 'image/*',
-                'id': 'imageInput'
+                'accept': 'image/*'
             }),
             'model_name': forms.Select(attrs={
                 'class': 'form-select'
@@ -401,3 +400,105 @@ class CustomLoginForm(forms.Form):
             raise ValidationError('请输入密码')
 
         return password
+
+
+class MultipleImageUploadForm(forms.Form):
+    """多图片上传表单"""
+    images = forms.FileField(
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/*',
+            'id': 'imageInput'
+        }),
+        required=True
+    )
+    model_name = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        initial='yolo11n-seg.pt'
+    )
+    confidence_threshold = forms.FloatField(
+        min_value=0.1,
+        max_value=1.0,
+        initial=0.25,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '0.1',
+            'max': '1.0',
+            'step': '0.05'
+        })
+    )
+    iou_threshold = forms.FloatField(
+        min_value=0.1,
+        max_value=1.0,
+        initial=0.45,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '0.1',
+            'max': '1.0',
+            'step': '0.05'
+        })
+    )
+    image_size = forms.ChoiceField(
+        choices=[
+            (320, '320x320 (快速)'),
+            (640, '640x640 (标准)'),
+            (1280, '1280x1280 (高精度)')
+        ],
+        initial=640,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['model_name'].choices = self._get_available_models()
+
+    def _get_available_models(self):
+        """获取实际存在的模型文件"""
+        from django.conf import settings
+        from pathlib import Path
+
+        model_choices = []
+        models_dir = settings.YOLO_MODELS_DIR
+
+        if models_dir.exists():
+            for model_file in models_dir.glob('*.pt'):
+                model_choices.append((model_file.name, model_file.name))
+
+        # 如果没有找到模型文件，提供默认选项
+        if not model_choices:
+            model_choices = [
+                ('yolo11n-seg.pt', 'YOLOv11n-seg (轻量级)'),
+                ('yolo11s-seg.pt', 'YOLOv11s-seg (小型)'),
+                ('yolo11m-seg.pt', 'YOLOv11m-seg (中型)'),
+                ('yolo11l-seg.pt', 'YOLOv11l-seg (大型)'),
+                ('yolo11x-seg.pt', 'YOLOv11x-seg (超大型)')
+            ]
+
+        return model_choices
+
+    def clean_images(self):
+        """验证上传的图片文件"""
+        files = self.files.getlist('images')
+
+        if not files:
+            raise ValidationError('请选择要上传的图片')
+
+        if len(files) > 10:  # 限制最多10张图片
+            raise ValidationError('最多只能同时上传10张图片')
+
+        for file in files:
+            # 检查文件大小
+            if file.size > settings.MAX_IMAGE_SIZE:
+                raise ValidationError(
+                    f'图片文件 {file.name} 过大，最大支持 {settings.MAX_IMAGE_SIZE // (1024*1024)}MB'
+                )
+
+            # 检查文件扩展名
+            ext = os.path.splitext(file.name)[1].lower()
+            if ext not in settings.ALLOWED_IMAGE_EXTENSIONS:
+                raise ValidationError(
+                    f'图片 {file.name} 格式不支持，支持的格式: {", ".join(settings.ALLOWED_IMAGE_EXTENSIONS)}'
+                )
+
+        return files

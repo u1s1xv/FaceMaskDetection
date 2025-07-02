@@ -46,64 +46,71 @@ logger = logging.getLogger(__name__)
 def api_upload_detect(request):
     """API: 上传图片并检测"""
     try:
-        if 'image' not in request.FILES:
+        # 支持单文件和多文件上传
+        images = request.FILES.getlist('image') or request.FILES.getlist('images')
+
+        if not images:
             return JsonResponse({'error': '没有上传图片'}, status=400)
 
-        image = request.FILES['image']
         model_name = request.POST.get('model_name', 'yolo11n-seg.pt')
         confidence = float(request.POST.get('confidence', 0.25))
         iou = float(request.POST.get('iou', 0.45))
         imgsz = int(request.POST.get('imgsz', 640))
 
-        # 创建检测记录，关联当前用户
-        record = DetectionRecord.objects.create(
-            user=request.user,  # 关联当前用户
-            original_image=image,
-            model_name=model_name,
-            confidence_threshold=confidence,
-            iou_threshold=iou,
-            image_size=imgsz,
-            status='pending'
-        )
-        
+        created_records = []
+
+        # 为每个图片创建检测记录
+        for image in images:
+            record = DetectionRecord.objects.create(
+                user=request.user,
+                original_image=image,
+                model_name=model_name,
+                confidence_threshold=confidence,
+                iou_threshold=iou,
+                image_size=imgsz,
+                status='pending'
+            )
+            created_records.append(record)
+
         # 执行检测
         inference_service = YOLOInferenceService()
-        result = inference_service.run_inference(
-            image_path=record.original_image.path,
-            model_name=model_name,
-            confidence=confidence,
-            iou=iou,
-            imgsz=imgsz
-        )
-        
-        # 更新记录
-        record.status = 'completed'
-        record.total_detections = result['total_detections']
-        record.with_mask_count = result['with_mask_count']
-        record.without_mask_count = result['without_mask_count']
-        record.incorrect_mask_count = result['incorrect_mask_count']
-        record.processing_time = result['processing_time']
-        record.detection_details = result['detections']
-        
-        # 保存结果图像
-        if result.get('beautified_image_path'):
-            result_image = inference_service.copy_result_image(
-                result['beautified_image_path'], 
-                record.result_image
+        results = []
+
+        for record in created_records:
+            result = inference_service.run_inference(
+                image_path=record.original_image.path,
+                model_name=model_name,
+                confidence=confidence,
+                iou=iou,
+                imgsz=imgsz
             )
-            if result_image:
-                record.result_image.save(
-                    f'result_{record.id}.png',
-                    result_image,
-                    save=False
+
+            # 更新记录
+            record.status = 'completed'
+            record.total_detections = result['total_detections']
+            record.with_mask_count = result['with_mask_count']
+            record.without_mask_count = result['without_mask_count']
+            record.incorrect_mask_count = result['incorrect_mask_count']
+            record.processing_time = result['processing_time']
+            record.detection_details = result['detections']
+
+            # 保存结果图像
+            if result.get('beautified_image_path'):
+                result_image = inference_service.copy_result_image(
+                    result['beautified_image_path'],
+                    record.result_image
                 )
-        
-        record.save()
-        
-        return JsonResponse({
-            'success': True,
-            'record_id': record.id,
-            'result': {
+                if result_image:
+                    record.result_image.save(
+                        f'result_{record.id}.png',
+                        result_image,
+                        save=False
+                    )
+
+            record.save()
+
+            results.append({
+                'record_id': record.id,
                 'total_detections': record.total_detections,
                 'with_mask_count': record.with_mask_count,
                 'without_mask_count': record.without_mask_count,
@@ -112,7 +119,12 @@ def api_upload_detect(request):
                 'original_image_url': record.original_image.url if record.original_image else None,
                 'result_image_url': record.result_image.url if record.result_image else None,
                 'detection_summary': record.detection_summary
-            }
+            })
+
+        return JsonResponse({
+            'success': True,
+            'batch_count': len(created_records),
+            'results': results
         })
         
     except Exception as e:

@@ -3,8 +3,10 @@
  */
 
 // 全局变量
-let uploadForm, fileInput, uploadArea, imagePreview, previewImg;
+let uploadForm, fileInput, uploadArea, imagePreview, previewContainer;
+let singlePreview, multiplePreview, previewImg;
 let submitBtn, progressContainer, progressBar, progressText;
+let selectedFiles = [];
 
 // 初始化
 $(document).ready(function() {
@@ -16,29 +18,46 @@ $(document).ready(function() {
 // 初始化DOM元素
 function initializeElements() {
     uploadForm = $('#uploadForm');
-    fileInput = $('#imageInput');
+    // 使用Django默认生成的ID
+    fileInput = $('#id_original_image');
     uploadArea = $('#uploadArea');
     imagePreview = $('#imagePreview');
+    singlePreview = $('#singlePreview');
+    multiplePreview = $('#multiplePreview');
+    previewContainer = $('#previewContainer');
     previewImg = $('#previewImg');
     submitBtn = $('#submitBtn');
     progressContainer = $('.progress-container');
     progressBar = $('.progress-bar');
     progressText = $('#progressText');
+
+    // 验证关键元素是否存在
+    if (!fileInput || fileInput.length === 0) {
+        console.error('文件输入框未找到！');
+        console.log('尝试查找的ID: #id_original_image');
+        console.log('页面中的所有input元素:', $('input'));
+    }
+
+    if (!uploadArea || uploadArea.length === 0) {
+        console.error('上传区域未找到！');
+    }
 }
 
 // 设置事件监听器
 function setupEventListeners() {
-    // 点击上传区域
-    uploadArea.on('click', function(e) {
-        e.preventDefault();
-        fileInput.click();
-    });
+    // 注意：点击事件现在在模板中处理，避免重复绑定
     
     // 文件选择变化
     fileInput.on('change', function() {
-        const file = this.files[0];
-        if (file) {
-            handleFileSelect(file);
+        const files = Array.from(this.files);
+        if (files.length > 0) {
+            if (files.length === 1) {
+                // 单张图片处理
+                handleSingleFileSelect(files[0]);
+            } else {
+                // 多张图片处理
+                handleMultipleFileSelect(files);
+            }
         }
     });
     
@@ -76,26 +95,70 @@ function setupDragAndDrop() {
         e.preventDefault();
         e.stopPropagation();
         $(this).removeClass('dragover');
-        
-        const files = e.originalEvent.dataTransfer.files;
+
+        const files = Array.from(e.originalEvent.dataTransfer.files);
         if (files.length > 0) {
-            const file = files[0];
-            if (validateFile(file)) {
-                fileInput[0].files = files;
-                handleFileSelect(file);
+            // 验证所有文件
+            const validFiles = files.filter(file => validateFile(file));
+            if (validFiles.length > 0) {
+                // 创建新的FileList对象
+                const dt = new DataTransfer();
+                validFiles.forEach(file => dt.items.add(file));
+                fileInput[0].files = dt.files;
+
+                // 智能处理单张或多张图片
+                if (validFiles.length === 1) {
+                    handleSingleFileSelect(validFiles[0]);
+                } else {
+                    handleMultipleFileSelect(validFiles);
+                }
             }
         }
     });
 }
 
-// 处理文件选择
-function handleFileSelect(file) {
+// 处理单文件选择
+function handleSingleFileSelect(file) {
     if (!validateFile(file)) {
         return;
     }
-    
-    previewImage(file);
-    updateUploadArea(file);
+
+    selectedFiles = [file]; // 保存为数组以保持一致性
+    previewSingleImage(file);
+    updateUploadAreaForSingle(file);
+}
+
+// 处理文件选择（保持向后兼容）
+function handleFileSelect(file) {
+    handleSingleFileSelect(file);
+}
+
+// 处理多文件选择
+function handleMultipleFileSelect(files) {
+    selectedFiles = [];
+    const validFiles = [];
+
+    // 验证所有文件
+    for (let file of files) {
+        if (validateFile(file)) {
+            validFiles.push(file);
+        }
+    }
+
+    if (validFiles.length === 0) {
+        return;
+    }
+
+    // 限制最多10张图片
+    if (validFiles.length > 10) {
+        showAlert('最多只能同时上传10张图片', 'warning');
+        selectedFiles = validFiles.slice(0, 10);
+    } else {
+        selectedFiles = validFiles;
+    }
+
+    previewMultipleImages(selectedFiles);
+    updateUploadAreaForMultiple(selectedFiles);
 }
 
 // 验证文件
@@ -117,27 +180,131 @@ function validateFile(file) {
     return true;
 }
 
-// 图片预览
-function previewImage(file) {
+// 单图片预览
+function previewSingleImage(file) {
     const reader = new FileReader();
     reader.onload = function(e) {
         previewImg.attr('src', e.target.result);
+        singlePreview.show();
+        multiplePreview.hide();
         imagePreview.fadeIn();
     };
     reader.readAsDataURL(file);
 }
 
-// 更新上传区域显示
-function updateUploadArea(file) {
+// 图片预览（保持向后兼容）
+function previewImage(file) {
+    previewSingleImage(file);
+}
+
+// 多图片预览
+function previewMultipleImages(files) {
+    previewContainer.empty();
+    singlePreview.hide();
+    multiplePreview.show();
+
+    files.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const previewHtml = `
+                <div class="col-md-3 col-sm-4 col-6 mb-3">
+                    <div class="position-relative">
+                        <img src="${e.target.result}" class="img-fluid rounded preview-thumbnail"
+                             alt="预览图片 ${index + 1}" style="height: 150px; object-fit: cover; width: 100%;">
+                        <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1 remove-image"
+                                data-index="${index}" style="padding: 2px 6px; font-size: 12px;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <div class="text-center mt-1">
+                            <small class="text-muted">${file.name}</small><br>
+                            <small class="text-muted">${formatFileSize(file.size)}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            previewContainer.append(previewHtml);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // 更新文件计数
+    $('#fileCount').text(files.length);
+    imagePreview.fadeIn();
+
+    // 绑定删除按钮事件
+    $(document).off('click', '.remove-image').on('click', '.remove-image', function() {
+        const index = parseInt($(this).data('index'));
+        removeImageFromSelection(index);
+    });
+}
+
+// 更新单文件上传区域显示
+function updateUploadAreaForSingle(file) {
     const fileName = file.name;
     const fileSize = formatFileSize(file.size);
-    
+
     uploadArea.html(`
         <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
-        <h6 class="text-success">文件已选择</h6>
+        <h6 class="text-success">已选择 1 张图片</h6>
         <p class="mb-1"><strong>${fileName}</strong></p>
         <p class="text-muted small">${fileSize}</p>
+        <p class="text-muted small">点击重新选择文件或拖拽多张图片</p>
+    `);
+}
+
+// 更新上传区域显示（保持向后兼容）
+function updateUploadArea(file) {
+    updateUploadAreaForSingle(file);
+}
+
+// 更新多文件上传区域显示
+function updateUploadAreaForMultiple(files) {
+    const fileCount = files.length;
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+
+    uploadArea.html(`
+        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+        <h6 class="text-success">已选择 ${fileCount} 张图片</h6>
+        <p class="text-muted small">总大小: ${formatFileSize(totalSize)}</p>
         <p class="text-muted small">点击重新选择文件</p>
+    `);
+}
+
+// 从选择中移除图片
+function removeImageFromSelection(index) {
+    selectedFiles.splice(index, 1);
+
+    if (selectedFiles.length === 0) {
+        // 重置上传区域
+        resetUploadArea();
+        imagePreview.fadeOut();
+    } else if (selectedFiles.length === 1) {
+        // 切换到单图片模式
+        const dt = new DataTransfer();
+        selectedFiles.forEach(file => dt.items.add(file));
+        fileInput[0].files = dt.files;
+
+        handleSingleFileSelect(selectedFiles[0]);
+    } else {
+        // 继续多图片模式
+        const dt = new DataTransfer();
+        selectedFiles.forEach(file => dt.items.add(file));
+        fileInput[0].files = dt.files;
+
+        previewMultipleImages(selectedFiles);
+        updateUploadAreaForMultiple(selectedFiles);
+    }
+}
+
+// 重置上传区域
+function resetUploadArea() {
+    selectedFiles = [];
+    singlePreview.hide();
+    multiplePreview.hide();
+    uploadArea.html(`
+        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+        <h5>拖拽图片到此处或点击选择文件</h5>
+        <p class="text-muted">支持 JPG, PNG, JPEG, BMP 格式，最大 10MB，支持单张或多张图片上传</p>
     `);
 }
 

@@ -93,15 +93,35 @@ def detect(request):
 def upload_and_detect(request):
     """上传图片并进行检测"""
     if request.method == 'POST':
-        form = ImageUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            try:
-                # 保存记录，关联当前用户
-                record = form.save(commit=False)
-                record.user = request.user  # 关联当前用户
-                record.status = 'pending'
-                record.save()
-                
+        # 检查是否有多个文件
+        files = request.FILES.getlist('original_image')
+
+        if not files:
+            messages.error(request, '请选择要上传的图片')
+            return redirect('index')
+
+        # 获取检测参数
+        model_name = request.POST.get('model_name', 'yolo11n-seg.pt')
+        confidence = float(request.POST.get('confidence_threshold', 0.25))
+        iou = float(request.POST.get('iou_threshold', 0.45))
+        image_size = int(request.POST.get('image_size', 640))
+
+        created_records = []
+
+        try:
+            # 为每个文件创建检测记录
+            for file in files:
+                record = DetectionRecord.objects.create(
+                    user=request.user,
+                    original_image=file,
+                    model_name=model_name,
+                    confidence_threshold=confidence,
+                    iou_threshold=iou,
+                    image_size=image_size,
+                    status='pending'
+                )
+                created_records.append(record)
+
                 # 执行检测
                 inference_service = YOLOInferenceService()
                 result = inference_service.run_inference(
@@ -111,7 +131,7 @@ def upload_and_detect(request):
                     iou=record.iou_threshold,
                     imgsz=record.image_size
                 )
-                
+
                 # 更新记录
                 record.status = 'processing'
                 record.total_detections = result['total_detections']
@@ -120,11 +140,11 @@ def upload_and_detect(request):
                 record.incorrect_mask_count = result['incorrect_mask_count']
                 record.processing_time = result['processing_time']
                 record.detection_details = result['detections']
-                
+
                 # 保存结果图像
                 if result.get('beautified_image_path'):
                     result_image = inference_service.copy_result_image(
-                        result['beautified_image_path'], 
+                        result['beautified_image_path'],
                         record.result_image
                     )
                     if result_image:
@@ -133,23 +153,29 @@ def upload_and_detect(request):
                             result_image,
                             save=False
                         )
-                
+
                 record.status = 'completed'
                 record.save()
-                
+
+            # 批量检测完成后的处理
+            if len(created_records) == 1:
                 messages.success(request, '检测完成！')
-                return redirect('detection_result', record_id=record.id)
-                
-            except Exception as e:
-                logger.error(f"检测失败: {str(e)}")
-                if 'record' in locals():
+                return redirect('detection_result', record_id=created_records[0].id)
+            else:
+                messages.success(request, f'批量检测完成！共处理了 {len(created_records)} 张图片')
+                # 暂时重定向到第一个结果页面，稍后实现批量结果页面
+                return redirect('detection_result', record_id=created_records[0].id)
+
+        except Exception as e:
+            logger.error(f"检测失败: {str(e)}")
+            # 将失败的记录标记为失败状态
+            for record in created_records:
+                if record.status != 'completed':
                     record.status = 'failed'
                     record.error_message = str(e)
                     record.save()
-                messages.error(request, f'检测失败: {str(e)}')
-                return redirect('index')
-        else:
-            messages.error(request, '表单验证失败，请检查输入')
+            messages.error(request, f'检测失败: {str(e)}')
+            return redirect('index')
     
     return redirect('index')
 
@@ -360,3 +386,49 @@ def get_detection_status(request, record_id):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def debug_form(request):
+    """调试表单HTML结构"""
+    form = ImageUploadForm()
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>表单调试</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; }}
+            .debug {{ background: #f0f0f0; padding: 10px; margin: 10px 0; }}
+            input[type="file"] {{ border: 2px solid red; padding: 5px; }}
+        </style>
+    </head>
+    <body>
+        <h1>Django表单HTML结构调试</h1>
+
+        <div class="debug">
+            <h3>原始表单字段HTML:</h3>
+            <pre>{form.original_image}</pre>
+        </div>
+
+        <div class="debug">
+            <h3>实际渲染的表单:</h3>
+            <form>
+                {form.original_image}
+            </form>
+        </div>
+
+        <div class="debug">
+            <h3>字段属性:</h3>
+            <p>字段名: {form.original_image.name}</p>
+            <p>字段ID: {form.original_image.id_for_label}</p>
+            <p>HTML名称: {form.original_image.html_name}</p>
+        </div>
+
+        <script>
+            console.log('文件输入框元素:', document.querySelector('input[type="file"]'));
+            console.log('所有input元素:', document.querySelectorAll('input'));
+        </script>
+    </body>
+    </html>
+    """
+    return HttpResponse(html_content)

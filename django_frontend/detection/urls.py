@@ -24,4 +24,7 @@ urlpatterns = [
     # 操作
     path('delete/<int:record_id>/', views.delete_record, name='delete_record'),
     path('status/<int:record_id>/', views.get_detection_status, name='detection_status'),
+
+    # 调试
+    path('debug-form/', views.debug_form, name='debug_form'),
 ]

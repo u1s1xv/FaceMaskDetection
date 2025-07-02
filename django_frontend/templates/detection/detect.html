@@ -17,16 +17,36 @@
                     {% csrf_token %}
                     
                     <!-- 拖拽上传区域 -->
-                    <div class="upload-area" id="uploadArea">
+                    <div class="upload-area" id="uploadArea" onclick="document.getElementById('id_original_image').click()">
                         <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
                         <h5>拖拽图片到此处或点击选择文件</h5>
-                        <p class="text-muted">支持 JPG, PNG, JPEG, BMP 格式，最大 10MB</p>
+                        <p class="text-muted">支持 JPG, PNG, JPEG, BMP 格式，最大 10MB<br>
+                        <strong>单张图片：</strong>点击选择或拖拽一张图片<br>
+                        <strong>多张图片：</strong>按住Ctrl多选或拖拽多张图片（最多10张）</p>
                         {{ form.original_image }}
                     </div>
-                    
+
                     <!-- 图片预览 -->
                     <div id="imagePreview" class="mt-3" style="display: none;">
-                        <img id="previewImg" class="preview-image" alt="预览图片">
+                        <!-- 单图片预览 -->
+                        <div id="singlePreview" style="display: none;">
+                            <div class="text-center">
+                                <img id="previewImg" class="preview-image" alt="预览图片" style="max-width: 100%; max-height: 300px; border-radius: 10px;">
+                            </div>
+                            <div class="mt-2 text-center">
+                                <small class="text-muted">已选择 1 张图片</small>
+                            </div>
+                        </div>
+
+                        <!-- 多图片预览 -->
+                        <div id="multiplePreview" style="display: none;">
+                            <div class="row" id="previewContainer">
+                                <!-- 多图片预览将在这里动态生成 -->
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">已选择 <span id="fileCount">0</span> 张图片</small>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- 检测参数 -->
@@ -190,98 +210,68 @@
 {% endblock %}
 
 {% block extra_js %}
+{% load static %}
 <script>
 $(document).ready(function() {
-    const uploadArea = $('#uploadArea');
-    const fileInput = $('#imageInput');
-    const imagePreview = $('#imagePreview');
-    const previewImg = $('#previewImg');
-    const uploadForm = $('#uploadForm');
-    const submitBtn = $('#submitBtn');
-    const progressContainer = $('.progress-container');
-    
-    // 拖拽上传功能
-    uploadArea.on('dragover', function(e) {
-        e.preventDefault();
-        $(this).addClass('dragover');
-    });
-    
-    uploadArea.on('dragleave', function(e) {
-        e.preventDefault();
-        $(this).removeClass('dragover');
-    });
-    
-    uploadArea.on('drop', function(e) {
-        e.preventDefault();
-        $(this).removeClass('dragover');
-        
-        const files = e.originalEvent.dataTransfer.files;
+    // 动态添加multiple属性
+    $('#id_original_image').attr('multiple', true);
+
+    // 文件选择变化处理
+    $('#id_original_image').on('change', function() {
+        const files = this.files;
+        console.log('选择了', files.length, '个文件');
+
         if (files.length > 0) {
-            fileInput[0].files = files;
-            previewImage(files[0]);
+            // 显示预览
+            showFilePreview(files);
         }
     });
-    
-    // 点击上传区域
-    uploadArea.on('click', function() {
-        fileInput.click();
-    });
-    
-    // 文件选择变化
-    fileInput.on('change', function() {
-        const file = this.files[0];
-        if (file) {
-            previewImage(file);
-        }
-    });
-    
-    // 图片预览
-    function previewImage(file) {
-        if (file && file.type.startsWith('image/')) {
+
+    function showFilePreview(files) {
+        const previewContainer = $('#previewContainer');
+        const imagePreview = $('#imagePreview');
+        const singlePreview = $('#singlePreview');
+        const multiplePreview = $('#multiplePreview');
+
+        if (files.length === 1) {
+            // 单张图片预览
+            const file = files[0];
             const reader = new FileReader();
             reader.onload = function(e) {
-                previewImg.attr('src', e.target.result);
-                imagePreview.show();
+                $('#previewImg').attr('src', e.target.result);
+                singlePreview.show();
+                multiplePreview.hide();
+                imagePreview.fadeIn();
             };
             reader.readAsDataURL(file);
+        } else if (files.length > 1) {
+            // 多张图片预览
+            previewContainer.empty();
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const previewHtml = `
+                        <div class="col-md-3 col-sm-4 col-6 mb-3">
+                            <div class="position-relative">
+                                <img src="${e.target.result}" class="img-fluid rounded"
+                                     style="height: 150px; object-fit: cover; width: 100%;" alt="预览图片 ${i + 1}">
+                                <div class="text-center mt-1">
+                                    <small class="text-muted">${file.name}</small>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    previewContainer.append(previewHtml);
+                };
+                reader.readAsDataURL(file);
+            }
+            $('#fileCount').text(files.length);
+            singlePreview.hide();
+            multiplePreview.show();
+            imagePreview.fadeIn();
         }
     }
-    
-    // 表单提交
-    uploadForm.on('submit', function() {
-        if (!fileInput[0].files.length) {
-            alert('请先选择要检测的图片');
-            return false;
-        }
-        
-        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 检测中...');
-        progressContainer.show();
-        
-        // 模拟进度条
-        let progress = 0;
-        const progressBar = $('.progress-bar');
-        const progressText = $('#progressText');
-        
-        const interval = setInterval(function() {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            
-            progressBar.css('width', progress + '%');
-            
-            if (progress < 30) {
-                progressText.text('正在上传图片...');
-            } else if (progress < 60) {
-                progressText.text('正在加载AI模型...');
-            } else {
-                progressText.text('正在进行检测分析...');
-            }
-        }, 500);
-        
-        // 清理定时器（实际提交后会跳转页面）
-        setTimeout(function() {
-            clearInterval(interval);
-        }, 30000);
-    });
 });
 </script>
 {% endblock %}
