@@ -1,7 +1,7 @@
 """
 API视图
 """
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
@@ -17,6 +17,7 @@ from datetime import datetime
 
 from .models import DetectionRecord, ModelConfig
 from .services import YOLOInferenceService
+from .pdf_utils import create_pdf_report
 
 # 大模型API配置 - 直接在这里定义，避免导入问题
 SILICONFLOW_CONFIG = {
@@ -333,6 +334,7 @@ def api_llm_analysis(request):
         model = data.get('model', DEFAULT_MODEL)
         record_id = data.get('record_id')
         detection_data = data.get('detection_data', {})
+        stream = data.get('stream', False)  # 是否启用流式输出
 
         if not prompt:
             return JsonResponse({'error': '请输入分析提示词'}, status=400)
@@ -349,7 +351,11 @@ def api_llm_analysis(request):
         # 构建分析上下文
         analysis_context = build_analysis_context(detection_data, prompt)
 
-        # 调用大模型API
+        # 如果启用流式输出
+        if stream:
+            return stream_llm_analysis(model, analysis_context, record_id)
+
+        # 传统的一次性输出
         analysis_result = call_llm_api(model, analysis_context)
 
         if analysis_result['success']:
@@ -372,6 +378,44 @@ def api_llm_analysis(request):
         return JsonResponse({'error': '请求数据格式错误'}, status=400)
     except Exception as e:
         logger.error(f"LLM分析失败: {str(e)}")
+        return JsonResponse({'error': f'分析失败: {str(e)}'}, status=500)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_llm_analysis_stream(request):
+    """API: 大模型流式分析接口"""
+    try:
+        # 解析请求数据
+        data = json.loads(request.body)
+        prompt = data.get('prompt', '').strip()
+        model = data.get('model', DEFAULT_MODEL)
+        record_id = data.get('record_id')
+        detection_data = data.get('detection_data', {})
+
+        if not prompt:
+            return JsonResponse({'error': '请输入分析提示词'}, status=400)
+
+        if not record_id:
+            return JsonResponse({'error': '缺少检测记录ID'}, status=400)
+
+        # 验证检测记录是否存在
+        try:
+            record = DetectionRecord.objects.get(id=record_id)
+        except DetectionRecord.DoesNotExist:
+            return JsonResponse({'error': '检测记录不存在'}, status=404)
+
+        # 构建分析上下文
+        analysis_context = build_analysis_context(detection_data, prompt)
+
+        # 返回流式响应
+        return stream_llm_analysis(model, analysis_context, record_id)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': '请求数据格式错误'}, status=400)
+    except Exception as e:
+        logger.error(f"流式LLM分析失败: {str(e)}")
         return JsonResponse({'error': f'分析失败: {str(e)}'}, status=500)
 
 
@@ -404,6 +448,97 @@ def build_analysis_context(detection_data, user_prompt):
 请用中文回答，语言专业且易懂。
 """
     return context.strip()
+
+
+def stream_llm_analysis(model, prompt, record_id):
+    """流式输出大模型分析"""
+    from django.http import StreamingHttpResponse
+    import json
+    import time
+
+    def generate_stream():
+        try:
+            # 验证模型是否在可用列表中
+            available_model_values = [m['value'] for m in AVAILABLE_MODELS]
+            if model not in available_model_values:
+                actual_model = DEFAULT_MODEL
+            else:
+                actual_model = model
+
+            # 构建API请求（启用流式输出）
+            payload = {
+                "model": actual_model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": SYSTEM_PROMPT
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "max_tokens": SILICONFLOW_CONFIG['max_tokens'],
+                "temperature": SILICONFLOW_CONFIG['temperature'],
+                "stream": True  # 启用流式输出
+            }
+
+            headers = {
+                "Authorization": f"Bearer {SILICONFLOW_CONFIG['api_key']}",
+                "Content-Type": "application/json"
+            }
+
+            # 发送流式请求
+            logger.info(f"调用SiliconFlow 流式API - 模型: {actual_model}")
+
+            # 发送开始事件
+            yield f"data: {json.dumps({'type': 'start', 'model': actual_model, 'timestamp': time.time()})}\n\n"
+
+            response = requests.post(
+                SILICONFLOW_CONFIG['base_url'],
+                json=payload,
+                headers=headers,
+                timeout=SILICONFLOW_CONFIG['timeout'],
+                stream=True
+            )
+
+            if response.status_code == 200:
+                # 处理流式响应
+                for line in response.iter_lines():
+                    if line:
+                        line_str = line.decode('utf-8')
+                        if line_str.startswith('data: '):
+                            data_str = line_str[6:]  # 移除 'data: ' 前缀
+
+                            if data_str.strip() == '[DONE]':
+                                # 流式输出结束
+                                yield f"data: {json.dumps({'type': 'done', 'timestamp': time.time()})}\n\n"
+                                break
+
+                            try:
+                                data = json.loads(data_str)
+                                if 'choices' in data and len(data['choices']) > 0:
+                                    delta = data['choices'][0].get('delta', {})
+                                    if 'content' in delta:
+                                        content = delta['content']
+                                        # 发送内容片段
+                                        yield f"data: {json.dumps({'type': 'content', 'content': content, 'timestamp': time.time()})}\n\n"
+                            except json.JSONDecodeError:
+                                continue
+            else:
+                # 流式API调用失败，发送错误事件
+                error_msg = f'API调用失败 (状态码: {response.status_code}): {response.text}'
+                yield f"data: {json.dumps({'type': 'error', 'error': error_msg, 'timestamp': time.time()})}\n\n"
+
+        except Exception as e:
+            logger.error(f"流式LLM分析失败: {str(e)}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e), 'timestamp': time.time()})}\n\n"
+
+    response = StreamingHttpResponse(generate_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['Connection'] = 'keep-alive'
+    response['Access-Control-Allow-Origin'] = '*'
+    return response
 
 
 def call_llm_api(model, prompt):
@@ -498,6 +633,68 @@ def call_llm_api(model, prompt):
         }
 
 
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_download_pdf_report(request):
+    """API: 下载PDF分析报告"""
+    try:
+        # 解析请求数据
+        data = json.loads(request.body)
+        record_id = data.get('record_id')
+        llm_analysis = data.get('llm_analysis', '')
+
+        if not record_id:
+            return JsonResponse({'error': '缺少检测记录ID'}, status=400)
+
+        if not llm_analysis:
+            return JsonResponse({'error': '缺少AI分析内容'}, status=400)
+
+        # 获取检测记录
+        try:
+            record = DetectionRecord.objects.get(id=record_id)
+        except DetectionRecord.DoesNotExist:
+            return JsonResponse({'error': '检测记录不存在'}, status=404)
+
+        # 准备数据
+        record_data = {
+            'id': record.id,
+            'upload_time': record.upload_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'model_name': record.model_name,
+            'confidence_threshold': record.confidence_threshold,
+            'total_detections': record.total_detections,
+            'with_mask_count': record.with_mask_count,
+            'without_mask_count': record.without_mask_count,
+            'incorrect_mask_count': record.incorrect_mask_count,
+        }
+
+        # 计算合规率
+        compliance_rate = 0
+        if record.total_detections > 0:
+            compliance_rate = (record.with_mask_count / record.total_detections) * 100
+
+        detection_summary = {
+            'compliance_rate': compliance_rate
+        }
+
+        # 生成PDF
+        pdf_data = create_pdf_report(record_data, detection_summary, llm_analysis)
+
+        # 创建HTTP响应
+        response = HttpResponse(pdf_data, content_type='application/pdf')
+        filename = f'口罩检测AI分析报告_{record.id}_{int(time.time())}.pdf'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = len(pdf_data)
+
+        logger.info(f"PDF报告生成成功 - 记录ID: {record_id}, 文件大小: {len(pdf_data)} bytes")
+
+        return response
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': '请求数据格式错误'}, status=400)
+    except Exception as e:
+        logger.error(f"PDF报告生成失败: {str(e)}")
+        return JsonResponse({'error': f'PDF生成失败: {str(e)}'}, status=500)
 
 
 

@@ -174,7 +174,7 @@
                                     id="downloadLLMResult"
                                     onclick="downloadLLMResult()"
                                     style="display: none;">
-                                <i class="fas fa-download"></i> 下载分析报告
+                                <i class="fas fa-download"></i> 下载PDF报告
                             </button>
                         </div>
                     </div>
@@ -376,12 +376,18 @@ let llmResultContent = '';
 
 // 开始LLM分析
 function startLLMAnalysis() {
+    console.log('startLLMAnalysis 被调用');
+
     if (llmAnalysisInProgress) {
+        console.log('分析正在进行中，跳过');
         return;
     }
 
     const prompt = $('#llmPrompt').val().trim();
     const model = $('#llmModel').val();
+
+    console.log('提示词:', prompt);
+    console.log('模型:', model);
 
     if (!prompt) {
         alert('请输入分析提示词');
@@ -389,7 +395,18 @@ function startLLMAnalysis() {
     }
 
     // 设置加载状态
-    setLLMLoadingState(true);
+    llmAnalysisInProgress = true;
+    $('#startLLMAnalysis').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 分析中...');
+
+    // 显示加载状态
+    $('#llmResultArea').html(`
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">分析中...</span>
+            </div>
+            <div class="mt-2">AI正在分析中，请稍候...</div>
+        </div>
+    `);
 
     // 准备请求数据
     const requestData = {
@@ -403,10 +420,71 @@ function startLLMAnalysis() {
             incorrect_mask_count: {{ record.incorrect_mask_count }},
             compliance_rate: {{ detection_summary.compliance_rate }},
             model_name: '{{ record.model_name }}',
-            confidence_threshold: {{ record.confidence_threshold }},
-            detection_details: {{ record.detection_details|safe }}
+            confidence_threshold: {{ record.confidence_threshold }}
         }
     };
+
+    console.log('发送请求数据:', requestData);
+
+    // 直接使用AJAX调用
+    $.ajax({
+        url: '/api/llm-analysis/',
+        type: 'POST',
+        data: JSON.stringify(requestData),
+        contentType: 'application/json',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        timeout: 60000,
+        success: function(response) {
+            console.log('成功响应:', response);
+            llmAnalysisInProgress = false;
+            $('#startLLMAnalysis').prop('disabled', false).html('<i class="fas fa-magic"></i> 开始AI分析');
+
+            if (response.success) {
+                $('#llmResultArea').html(`
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-check-circle"></i> 分析完成</h6>
+                        <div style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${response.analysis}</div>
+                    </div>
+                `);
+                llmResultContent = response.analysis;
+                $('#copyLLMResult, #downloadLLMResult').show();
+            } else {
+                $('#llmResultArea').html(`
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-exclamation-triangle"></i> 分析失败</h6>
+                        <p>${response.error || '未知错误'}</p>
+                    </div>
+                `);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('请求失败:', xhr, status, error);
+            llmAnalysisInProgress = false;
+            $('#startLLMAnalysis').prop('disabled', false).html('<i class="fas fa-magic"></i> 开始AI分析');
+
+            let errorMsg = '网络错误，请检查连接后重试';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMsg = xhr.responseJSON.error;
+            } else if (status === 'timeout') {
+                errorMsg = '请求超时，请重试';
+            }
+
+            $('#llmResultArea').html(`
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-triangle"></i> 请求失败</h6>
+                    <p>${errorMsg}</p>
+                    <small>状态: ${status}, 错误: ${error}</small>
+                </div>
+            `);
+        }
+    });
+}
+
+// 传统分析方式（备用）
+function startTraditionalAnalysis(requestData) {
+    console.log('开始传统分析，请求数据:', requestData);
 
     // 发送API请求
     $.ajax({
@@ -419,6 +497,7 @@ function startLLMAnalysis() {
         },
         timeout: 60000, // 60秒超时
         success: function(response) {
+            console.log('LLM API响应:', response);
             if (response.success) {
                 displayLLMResult(response.analysis, response.model_used, response.api_provider);
                 llmResultContent = response.analysis;
@@ -427,6 +506,7 @@ function startLLMAnalysis() {
             }
         },
         error: function(xhr, status, error) {
+            console.error('LLM API错误:', xhr, status, error);
             let errorMsg = '网络错误，请检查连接后重试';
             if (xhr.responseJSON && xhr.responseJSON.error) {
                 errorMsg = xhr.responseJSON.error;
@@ -441,23 +521,212 @@ function startLLMAnalysis() {
     });
 }
 
+// 流式分析函数
+function startStreamingAnalysis(requestData) {
+    const $resultArea = $('#llmResultArea');
+
+    // 初始化流式显示
+    $resultArea.html(`
+        <div class="llm-loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">分析中...</span>
+            </div>
+            <div class="mt-2">AI正在分析中，请稍候...</div>
+        </div>
+    `);
+
+    let streamContent = '';
+    let modelUsed = '';
+
+    // 发送请求并处理流式响应
+    fetch('/api/llm-analysis-stream/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        body: JSON.stringify(requestData)
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error('网络请求失败');
+        }
+
+        // 处理流式响应
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        function readStream() {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    // 流式输出完成
+                    finishStreamingAnalysis(streamContent, modelUsed);
+                    return;
+                }
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6);
+                        if (dataStr.trim() === '') continue;
+
+                        try {
+                            const data = JSON.parse(dataStr);
+                            handleStreamEvent(data);
+                        } catch (e) {
+                            console.error('解析流式数据失败:', e);
+                        }
+                    }
+                }
+
+                readStream();
+            }).catch(error => {
+                console.error('读取流式数据失败:', error);
+                displayLLMError('流式分析失败，请重试');
+                setLLMLoadingState(false);
+            });
+        }
+
+        readStream();
+    }).catch(error => {
+        console.error('启动流式分析失败:', error);
+        displayLLMError('启动分析失败，请重试');
+        setLLMLoadingState(false);
+    });
+
+    // 处理流式事件
+    function handleStreamEvent(data) {
+        switch (data.type) {
+            case 'start':
+                modelUsed = data.model;
+                streamContent = '';
+                // 显示开始分析状态
+                $resultArea.html(`
+                    <div class="llm-loading">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">分析中...</span>
+                        </div>
+                        <div class="mt-2">使用 ${data.model} 模型分析中...</div>
+                    </div>
+                `);
+                break;
+
+            case 'content':
+                streamContent += data.content;
+                // 实时更新显示内容
+                updateStreamingContent(streamContent, modelUsed);
+                break;
+
+            case 'done':
+                // 分析完成
+                finishStreamingAnalysis(streamContent, modelUsed);
+                break;
+
+            case 'error':
+                displayLLMError(data.error);
+                setLLMLoadingState(false);
+                break;
+        }
+    }
+}
+
+// 更新流式内容显示
+function updateStreamingContent(content, modelUsed) {
+    const $resultArea = $('#llmResultArea');
+    const formattedContent = formatAnalysisResult(content);
+
+    let modelInfo = '';
+    if (modelUsed) {
+        modelInfo = `
+            <div class="mb-2">
+                <small class="text-muted">
+                    <i class="fas fa-microchip text-primary"></i>
+                    SiliconFlow - ${modelUsed}
+                </small>
+            </div>
+        `;
+    }
+
+    $resultArea.html(`
+        <div class="llm-result-success">
+            <div class="d-flex align-items-center mb-2">
+                <i class="fas fa-robot text-primary me-2"></i>
+                <strong>AI分析中...</strong>
+            </div>
+            ${modelInfo}
+            <div class="llm-result-content streaming-text">${formattedContent}</div>
+        </div>
+    `).addClass('has-content');
+
+    // 自动滚动到底部
+    $resultArea.scrollTop($resultArea[0].scrollHeight);
+}
+
+// 完成流式分析
+function finishStreamingAnalysis(content, modelUsed) {
+    const $resultArea = $('#llmResultArea');
+    const $copyBtn = $('#copyLLMResult');
+    const $downloadBtn = $('#downloadLLMResult');
+
+    const formattedContent = formatAnalysisResult(content);
+
+    let modelInfo = '';
+    if (modelUsed) {
+        modelInfo = `
+            <div class="mb-2">
+                <small class="text-muted">
+                    <i class="fas fa-microchip text-primary"></i>
+                    SiliconFlow - ${modelUsed}
+                </small>
+            </div>
+        `;
+    }
+
+    $resultArea.html(`
+        <div class="llm-result-success">
+            <div class="d-flex align-items-center mb-2">
+                <i class="fas fa-check-circle text-success me-2"></i>
+                <strong>AI分析完成</strong>
+            </div>
+            ${modelInfo}
+            <div class="llm-result-content">${formattedContent}</div>
+        </div>
+    `).addClass('has-content');
+
+    // 保存结果内容
+    llmResultContent = content;
+
+    // 显示操作按钮
+    $copyBtn.show();
+    $downloadBtn.show();
+
+    // 设置加载状态为完成
+    setLLMLoadingState(false);
+}
+
 // 设置加载状态
 function setLLMLoadingState(loading) {
     llmAnalysisInProgress = loading;
     const $button = $('#startLLMAnalysis');
-    const $loadingState = $('#llmLoadingState');
     const $resultArea = $('#llmResultArea');
 
     if (loading) {
         $button.prop('disabled', true)
                .html('<i class="fas fa-spinner fa-spin"></i> 分析中...');
-        $loadingState.show();
-        $resultArea.hide();
+
+        // 显示加载状态
+        $resultArea.html(`
+            <div class="llm-loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">分析中...</span>
+                </div>
+                <div class="mt-2">AI正在分析中，请稍候...</div>
+            </div>
+        `).removeClass('has-content');
     } else {
         $button.prop('disabled', false)
                .html('<i class="fas fa-magic"></i> 开始AI分析');
-        $loadingState.hide();
-        $resultArea.show();
     }
 }
 
@@ -504,31 +773,19 @@ function displayLLMResult(analysis, modelUsed, apiProvider) {
 // 显示LLM错误信息
 function displayLLMError(error) {
     const $resultArea = $('#llmResultArea');
+    console.log('显示LLM错误:', error);
 
     $resultArea.html(`
-        <div class="llm-result-warning">
-            <div class="d-flex align-items-center mb-2">
-                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
-                <strong>分析失败</strong>
-            </div>
-            <div class="text-muted mb-3">${error}</div>
-            <div class="d-flex gap-2 mb-2">
-                <button type="button"
-                        class="btn btn-outline-primary btn-sm"
-                        onclick="retryLLMAnalysis()">
-                    <i class="fas fa-redo"></i> 重试分析
+        <div class="llm-result-error">
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-exclamation-triangle"></i> 分析失败</h6>
+                <p class="mb-2">${error}</p>
+                <button type="button" class="btn btn-outline-primary btn-sm me-2" onclick="retryLLMAnalysis()">
+                    <i class="fas fa-redo"></i> 重试
                 </button>
-                <button type="button"
-                        class="btn btn-outline-secondary btn-sm"
-                        onclick="clearLLMResult()">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearLLMResult()">
                     <i class="fas fa-times"></i> 清除
                 </button>
-            </div>
-            <div class="mt-2">
-                <small class="text-muted">
-                    <i class="fas fa-lightbulb"></i>
-                    建议：检查网络连接或稍后重试，如果问题持续请联系管理员
-                </small>
             </div>
         </div>
     `).removeClass('has-content');
@@ -555,15 +812,46 @@ function clearLLMResult() {
 
 // 格式化分析结果
 function formatAnalysisResult(analysis) {
-    // 将换行符转换为HTML换行
-    let formatted = analysis.replace(/\n/g, '<br>');
+    if (!analysis) return '';
 
-    // 高亮关键词
-    const keywords = ['正确佩戴', '未佩戴', '错误佩戴', '建议', '总结', '分析', '合规率'];
-    keywords.forEach(keyword => {
-        const regex = new RegExp(`(${keyword})`, 'gi');
-        formatted = formatted.replace(regex, '<strong class="text-primary">$1</strong>');
-    });
+    // 先进行HTML转义
+    let formatted = analysis
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // 处理标题（# ## ###）
+    formatted = formatted
+        .replace(/^### (.*$)/gm, '<h6 class="text-primary fw-bold mt-3 mb-2">$1</h6>')
+        .replace(/^## (.*$)/gm, '<h5 class="text-primary fw-bold mt-3 mb-2">$1</h5>')
+        .replace(/^# (.*$)/gm, '<h4 class="text-primary fw-bold mt-3 mb-2">$1</h4>');
+
+    // 处理粗体和斜体
+    formatted = formatted
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-dark">$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em class="text-muted">$1</em>');
+
+    // 处理列表项
+    formatted = formatted
+        .replace(/^- (.*$)/gm, '<div class="mb-1"><i class="fas fa-circle text-primary me-2" style="font-size: 0.5em; vertical-align: middle;"></i>$1</div>')
+        .replace(/^\* (.*$)/gm, '<div class="mb-1"><i class="fas fa-circle text-primary me-2" style="font-size: 0.5em; vertical-align: middle;"></i>$1</div>');
+
+    // 处理数字列表
+    formatted = formatted.replace(/^(\d+)\. (.*$)/gm, '<div class="mb-1"><span class="badge bg-primary me-2" style="font-size: 0.7em;">$1</span>$2</div>');
+
+    // 处理代码块（如果有）
+    formatted = formatted
+        .replace(/`([^`]+)`/g, '<code class="bg-light text-dark px-1 rounded">$1</code>');
+
+    // 处理换行
+    formatted = formatted.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+
+    // 处理特殊关键词高亮
+    formatted = formatted
+        .replace(/(建议|推荐|注意|重要|警告|提醒)/g, '<span class="badge bg-warning text-dark me-1">$1</span>')
+        .replace(/(优秀|良好|合格|达标)/g, '<span class="badge bg-success me-1">$1</span>')
+        .replace(/(不合格|不达标|需要改进|问题)/g, '<span class="badge bg-danger me-1">$1</span>')
+        .replace(/(口罩|佩戴|检测|分析)/g, '<span class="text-primary fw-semibold">$1</span>');
 
     return formatted;
 }
@@ -598,46 +886,82 @@ function copyLLMResult() {
     document.body.removeChild(textArea);
 }
 
-// 下载LLM分析报告
+// 下载LLM分析报告 (PDF格式)
 function downloadLLMResult() {
     if (!llmResultContent) {
         alert('暂无结果可下载');
         return;
     }
 
-    // 创建完整的分析报告
-    const reportContent = `
-口罩检测AI分析报告
-==================
+    // 显示下载状态
+    const $downloadBtn = $('#downloadLLMResult');
+    const originalText = $downloadBtn.html();
+    $downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 生成PDF中...');
 
-检测记录ID: {{ record.id }}
-检测时间: {{ record.upload_time|date:"Y-m-d H:i:s" }}
-使用模型: {{ record.model_name }}
+    // 准备请求数据
+    const requestData = {
+        record_id: {{ record.id }},
+        llm_analysis: llmResultContent
+    };
 
-检测结果统计:
-- 总检测数量: {{ record.total_detections }}
-- 正确佩戴: {{ record.with_mask_count }}
-- 未佩戴口罩: {{ record.without_mask_count }}
-- 错误佩戴: {{ record.incorrect_mask_count }}
-- 合规率: {{ detection_summary.compliance_rate }}%
+    // 发送PDF生成请求
+    $.ajax({
+        url: '/api/download-pdf-report/',
+        type: 'POST',
+        data: JSON.stringify(requestData),
+        contentType: 'application/json',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        xhrFields: {
+            responseType: 'blob'  // 重要：设置响应类型为blob
+        },
+        timeout: 30000,  // 30秒超时
+        success: function(data, status, xhr) {
+            console.log('PDF生成成功');
 
-AI智能分析:
-${llmResultContent}
+            // 从响应头获取文件名
+            const contentDisposition = xhr.getResponseHeader('Content-Disposition');
+            let filename = `口罩检测AI分析报告_${new Date().getTime()}.pdf`;
 
-报告生成时间: ${new Date().toLocaleString('zh-CN')}
-    `.trim();
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
 
-    // 创建下载链接
-    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `口罩检测AI分析报告_${new Date().getTime()}.txt`;
+            // 创建下载链接
+            const blob = new Blob([data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            // 恢复按钮状态
+            $downloadBtn.prop('disabled', false).html(originalText);
+        },
+        error: function(xhr, status, error) {
+            console.error('PDF生成失败:', error);
+
+            let errorMessage = 'PDF生成失败，请重试';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMessage = xhr.responseJSON.error;
+            } else if (status === 'timeout') {
+                errorMessage = 'PDF生成超时，请重试';
+            }
+
+            alert(errorMessage);
+
+            // 恢复按钮状态
+            $downloadBtn.prop('disabled', false).html(originalText);
+        }
+    });
 }
 
 // 页面加载完成后的初始化
