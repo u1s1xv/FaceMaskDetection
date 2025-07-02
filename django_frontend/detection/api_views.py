@@ -17,13 +17,14 @@ from datetime import datetime
 
 from .models import DetectionRecord, ModelConfig
 from .services import YOLOInferenceService
+from .pdf_service import PDFReportService
 
 # 大模型API配置 - 直接在这里定义，避免导入问题
 SILICONFLOW_CONFIG = {
     'api_key': '***REMOVED-API-KEY***',  # 请替换为您的实际API密钥
     'base_url': 'https://api.siliconflow.cn/v1/chat/completions',
-    'timeout': 30,
-    'max_tokens': 1000,
+    'timeout': 120,  # 增加到120秒，给AI更多时间生成完整回答
+    'max_tokens': 4000,  # 增加到4000，允许更长的回答
     'temperature': 0.7
 }
 
@@ -589,12 +590,25 @@ def call_llm_api(model, prompt):
             if 'choices' in response_data and len(response_data['choices']) > 0:
                 analysis_content = response_data['choices'][0]['message']['content']
 
+                # 记录响应信息用于调试
+                choice = response_data['choices'][0]
+                finish_reason = choice.get('finish_reason', 'unknown')
+                content_length = len(analysis_content) if analysis_content else 0
+
                 logger.info(f"SiliconFlow API调用成功 - 模型: {actual_model}")
+                logger.info(f"响应长度: {content_length} 字符, 结束原因: {finish_reason}")
+
+                # 如果因为长度限制而截断，记录警告
+                if finish_reason == 'length':
+                    logger.warning(f"AI回答因长度限制被截断 - 当前max_tokens: {SILICONFLOW_CONFIG['max_tokens']}")
+
                 return {
                     'success': True,
                     'content': analysis_content,
                     'model_used': actual_model,
-                    'api_provider': 'SiliconFlow'
+                    'api_provider': 'SiliconFlow',
+                    'finish_reason': finish_reason,
+                    'content_length': content_length
                 }
             else:
                 logger.error(f"SiliconFlow API响应格式错误: {response_data}")
@@ -631,6 +645,53 @@ def call_llm_api(model, prompt):
             'error': f'API调用异常: {str(e)}，请重试'
         }
 
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_download_llm_pdf(request):
+    """API: 下载LLM分析PDF报告"""
+    try:
+        # 解析请求数据
+        data = json.loads(request.body)
+        record_id = data.get('record_id')
+        llm_content = data.get('llm_content', '').strip()
+        model_used = data.get('model_used')
+
+        if not record_id:
+            return JsonResponse({'error': '缺少检测记录ID'}, status=400)
+
+        if not llm_content:
+            return JsonResponse({'error': '缺少LLM分析内容'}, status=400)
+
+        # 验证检测记录是否存在且属于当前用户
+        try:
+            record = DetectionRecord.objects.get(id=record_id, user=request.user)
+        except DetectionRecord.DoesNotExist:
+            return JsonResponse({'error': '检测记录不存在或无权限访问'}, status=404)
+
+        # 生成PDF
+        pdf_service = PDFReportService()
+        pdf_data = pdf_service.generate_llm_analysis_pdf(record, llm_content, model_used)
+
+        # 生成文件名
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'口罩检测AI分析报告_{record.id}_{timestamp}.pdf'
+
+        # 返回PDF文件
+        response = HttpResponse(pdf_data, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = len(pdf_data)
+
+        logger.info(f"PDF报告生成成功 - 记录ID: {record_id}, 用户: {request.user.username}")
+
+        return response
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': '请求数据格式错误'}, status=400)
+    except Exception as e:
+        logger.error(f"PDF报告生成失败: {str(e)}")
+        return JsonResponse({'error': f'PDF生成失败: {str(e)}'}, status=500)
 
 
 

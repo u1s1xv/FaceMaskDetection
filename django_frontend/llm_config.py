@@ -7,8 +7,8 @@ import os
 SILICONFLOW_CONFIG = {
     'api_key': os.getenv('SILICONFLOW_API_KEY', 'sk-your-api-key-here'),
     'base_url': 'https://api.siliconflow.cn/v1/chat/completions',
-    'timeout': 30,
-    'max_tokens': 1000,
+    'timeout': 120,  # 增加到120秒，给AI更多时间生成完整回答
+    'max_tokens': 4000,  # 增加到4000，允许更长的回答
     'temperature': 0.7
 }
 

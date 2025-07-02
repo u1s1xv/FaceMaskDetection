@@ -16,4 +16,5 @@ urlpatterns = [
     path('llm-models/', api_views.api_get_llm_models, name='api_get_llm_models'),
     path('llm-analysis/', api_views.api_llm_analysis, name='api_llm_analysis'),
     path('llm-analysis-stream/', api_views.api_llm_analysis_stream, name='api_llm_analysis_stream'),
+    path('llm-pdf-download/', api_views.api_download_llm_pdf, name='api_download_llm_pdf'),
 ]
