@@ -27,7 +27,7 @@ LABEL_MAPPING = {
 COLOR_MAPPING = {
     "with_mask": (0, 255, 0),  # 绿色 (BGR)
     "without_mask": (255, 0, 0),  # 红色 (BGR)
-    "mask_weared_incorrect": (240, 234, 24)  # 蓝色 (BGR)
+    "mask_weared_incorrect": (255, 193, 7)  # 黄色 (BGR)
 }
 
 
