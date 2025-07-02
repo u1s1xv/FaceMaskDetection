@@ -12,13 +12,29 @@ SILICONFLOW_CONFIG = {
     'temperature': 0.7
 }
 
-# 模型映射配置 - 将前端选择的模型映射到SiliconFlow的实际模型
-MODEL_MAPPING = {
-    'gpt-4': 'Qwen/QwQ-32B',
-    'gpt-3.5-turbo': 'Qwen/Qwen2.5-7B-Instruct', 
-    'claude-3-sonnet': 'Qwen/QwQ-32B',
-    'gemini-pro': 'Qwen/QwQ-32B'
-}
+# 可用的SiliconFlow模型列表
+AVAILABLE_MODELS = [
+    {
+        'value': 'Qwen/QwQ-32B',
+        'name': 'Qwen QwQ-32B',
+        'description': '强大的推理模型，适合复杂分析'
+    },
+    {
+        'value': 'Qwen/Qwen2.5-7B-Instruct',
+        'name': 'Qwen 2.5-7B-Instruct',
+        'description': '快速响应，适合一般分析'
+    },
+    {
+        'value': 'Qwen/Qwen2.5-14B-Instruct',
+        'name': 'Qwen 2.5-14B-Instruct',
+        'description': '平衡性能，综合分析能力强'
+    },
+    {
+        'value': 'deepseek-ai/DeepSeek-V2.5',
+        'name': 'DeepSeek V2.5',
+        'description': '深度思考模型，适合专业分析'
+    }
+]
 
 # 默认模型
 DEFAULT_MODEL = 'Qwen/QwQ-32B'

@@ -72,7 +72,7 @@ def test_django_llm_api():
     
     test_data = {
         "prompt": "基于检测结果，请分析这张图片中的口罩佩戴情况，并给出专业的评估和建议。",
-        "model": "gpt-4",
+        "model": "Qwen/QwQ-32B",
         "record_id": 17,  # 请确保这个记录ID存在
         "detection_data": {
             "total_detections": 5,

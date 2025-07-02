@@ -114,10 +114,10 @@
                                 <i class="fas fa-brain"></i> 选择AI模型
                             </label>
                             <select class="form-select llm-model-select" id="llmModel">
-                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo (快速)</option>
-                                <option value="gpt-4" selected>GPT-4 (精准)</option>
-                                <option value="claude-3-sonnet">Claude-3 Sonnet</option>
-                                <option value="gemini-pro">Gemini Pro</option>
+                                <option value="Qwen/QwQ-32B" selected>Qwen QwQ-32B (强大推理)</option>
+                                <option value="Qwen/Qwen2.5-7B-Instruct">Qwen 2.5-7B-Instruct (快速响应)</option>
+                                <option value="Qwen/Qwen2.5-14B-Instruct">Qwen 2.5-14B-Instruct (平衡性能)</option>
+                                <option value="deepseek-ai/DeepSeek-V2.5">DeepSeek V2.5 (深度思考)</option>
                             </select>
                         </div>
 
@@ -511,15 +511,46 @@ function displayLLMError(error) {
                 <i class="fas fa-exclamation-triangle text-warning me-2"></i>
                 <strong>分析失败</strong>
             </div>
-            <div class="text-muted">${error}</div>
+            <div class="text-muted mb-3">${error}</div>
+            <div class="d-flex gap-2 mb-2">
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm"
+                        onclick="retryLLMAnalysis()">
+                    <i class="fas fa-redo"></i> 重试分析
+                </button>
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        onclick="clearLLMResult()">
+                    <i class="fas fa-times"></i> 清除
+                </button>
+            </div>
             <div class="mt-2">
                 <small class="text-muted">
                     <i class="fas fa-lightbulb"></i>
-                    建议：检查网络连接或稍后重试
+                    建议：检查网络连接或稍后重试，如果问题持续请联系管理员
                 </small>
             </div>
         </div>
     `).removeClass('has-content');
+}
+
+// 重试LLM分析
+function retryLLMAnalysis() {
+    if (llmAnalysisInProgress) {
+        return;
+    }
+
+    // 清除之前的错误信息
+    $('#llmResultArea').empty();
+
+    // 重新开始分析
+    startLLMAnalysis();
+}
+
+// 清除LLM结果
+function clearLLMResult() {
+    $('#llmResultArea').empty().removeClass('has-content');
+    llmResultContent = '';
 }
 
 // 格式化分析结果
@@ -629,17 +660,17 @@ $(document).ready(function() {
         let tip = '';
 
         switch(model) {
-            case 'gpt-3.5-turbo':
-                tip = '快速响应，适合简单分析';
+            case 'Qwen/QwQ-32B':
+                tip = '强大的推理模型，适合复杂分析';
                 break;
-            case 'gpt-4':
-                tip = '深度分析，结果更准确';
+            case 'Qwen/Qwen2.5-7B-Instruct':
+                tip = '快速响应，适合一般分析';
                 break;
-            case 'claude-3-sonnet':
+            case 'Qwen/Qwen2.5-14B-Instruct':
                 tip = '平衡性能，综合分析能力强';
                 break;
-            case 'gemini-pro':
-                tip = '多模态分析，支持图像理解';
+            case 'deepseek-ai/DeepSeek-V2.5':
+                tip = '深度思考模型，适合专业分析';
                 break;
         }
 

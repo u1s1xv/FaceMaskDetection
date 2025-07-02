@@ -27,12 +27,11 @@ SILICONFLOW_CONFIG = {
     'temperature': 0.7
 }
 
-MODEL_MAPPING = {
-    'gpt-4': 'Qwen/QwQ-32B',
-    'gpt-3.5-turbo': 'Qwen/Qwen2.5-7B-Instruct',
-    'claude-3-sonnet': 'Qwen/QwQ-32B',
-    'gemini-pro': 'Qwen/QwQ-32B'
-}
+# 从配置文件导入可用模型
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from llm_config import AVAILABLE_MODELS
 
 DEFAULT_MODEL = 'Qwen/QwQ-32B'
 SYSTEM_PROMPT = "你是一个专业的口罩检测分析专家，请用中文回答，语言专业且易懂。"
@@ -288,6 +287,21 @@ def api_delete_record(request, record_id):
 
 
 @login_required
+@require_http_methods(["GET"])
+def api_get_llm_models(request):
+    """API: 获取可用的LLM模型列表"""
+    try:
+        return JsonResponse({
+            'success': True,
+            'models': AVAILABLE_MODELS,
+            'default_model': DEFAULT_MODEL
+        })
+    except Exception as e:
+        logger.error(f"获取LLM模型列表失败: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_clear_cache(request):
@@ -316,7 +330,7 @@ def api_llm_analysis(request):
         # 解析请求数据
         data = json.loads(request.body)
         prompt = data.get('prompt', '').strip()
-        model = data.get('model', 'gpt-3.5-turbo')
+        model = data.get('model', DEFAULT_MODEL)
         record_id = data.get('record_id')
         detection_data = data.get('detection_data', {})
 
@@ -345,7 +359,8 @@ def api_llm_analysis(request):
             return JsonResponse({
                 'success': True,
                 'analysis': analysis_result['content'],
-                'model_used': model,
+                'model_used': analysis_result.get('model_used', model),
+                'api_provider': analysis_result.get('api_provider', 'SiliconFlow'),
                 'timestamp': datetime.now().isoformat()
             })
         else:
@@ -394,8 +409,12 @@ def build_analysis_context(detection_data, user_prompt):
 def call_llm_api(model, prompt):
     """调用大模型API"""
     try:
-        # 获取实际的模型名称
-        actual_model = MODEL_MAPPING.get(model, DEFAULT_MODEL)
+        # 验证模型是否在可用列表中
+        available_model_values = [m['value'] for m in AVAILABLE_MODELS]
+        if model not in available_model_values:
+            model = DEFAULT_MODEL
+
+        actual_model = model
 
         # 构建API请求
         payload = {
@@ -450,187 +469,36 @@ def call_llm_api(model, prompt):
                     'error': 'API响应格式错误'
                 }
         else:
-            # API调用失败，使用备用的模拟结果
-            logger.warning(f"SiliconFlow API调用失败 (状态码: {response.status_code})，使用备用模拟结果")
-            logger.warning(f"错误响应: {response.text}")
+            # API调用失败，直接返回错误
+            logger.error(f"SiliconFlow API调用失败 (状态码: {response.status_code})")
+            logger.error(f"错误响应: {response.text}")
 
-            # 返回模拟结果作为备用
-            return call_fallback_analysis(model, prompt)
+            return {
+                'success': False,
+                'error': f'API调用失败 (状态码: {response.status_code}): {response.text}'
+            }
 
     except requests.exceptions.Timeout:
-        logger.error("SiliconFlow API调用超时，使用备用模拟结果")
-        return call_fallback_analysis(model, prompt)
-    except requests.exceptions.RequestException as e:
-        logger.error(f"SiliconFlow API网络错误: {str(e)}，使用备用模拟结果")
-        return call_fallback_analysis(model, prompt)
-    except Exception as e:
-        logger.error(f"调用LLM API失败: {str(e)}，使用备用模拟结果")
-        return call_fallback_analysis(model, prompt)
-
-
-def call_fallback_analysis(model, prompt):
-    """备用分析方法 - 当API调用失败时使用模拟结果"""
-    try:
-        logger.info(f"使用备用分析方法 - 模型: {model}")
-
-        # 根据不同模型返回不同的模拟结果
-        if 'gpt' in model.lower():
-            analysis = generate_gpt_style_analysis(prompt)
-        elif 'claude' in model.lower():
-            analysis = generate_claude_style_analysis(prompt)
-        elif 'gemini' in model.lower():
-            analysis = generate_gemini_style_analysis(prompt)
-        else:
-            analysis = generate_default_analysis(prompt)
-
-        return {
-            'success': True,
-            'content': analysis,
-            'model_used': f'{model} (模拟)',
-            'api_provider': 'Fallback'
-        }
-
-    except Exception as e:
-        logger.error(f"备用分析方法也失败: {str(e)}")
+        logger.error("SiliconFlow API调用超时")
         return {
             'success': False,
-            'error': f'分析失败: {str(e)}'
+            'error': 'API调用超时，请稍后重试'
+        }
+    except requests.exceptions.RequestException as e:
+        logger.error(f"SiliconFlow API网络错误: {str(e)}")
+        return {
+            'success': False,
+            'error': f'网络连接错误: {str(e)}，请检查网络连接后重试'
+        }
+    except Exception as e:
+        logger.error(f"调用LLM API失败: {str(e)}")
+        return {
+            'success': False,
+            'error': f'API调用异常: {str(e)}，请重试'
         }
 
 
-def generate_gpt_style_analysis(prompt):
-    """生成GPT风格的分析结果（示例）"""
-    return """
-## 📊 检测结果专业分析报告
-
-### 1. 检测结果评估
-根据AI检测系统的分析结果，本次检测展现了以下特点：
-- 检测精度较高，能够准确识别不同的口罩佩戴状态
-- 系统成功区分了正确佩戴、未佩戴和错误佩戴三种情况
-- 检测结果具有较高的可信度
-
-### 2. 合规性分析
-从防疫合规角度分析：
-- 当前合规率反映了被检测区域的防疫意识水平
-- 需要重点关注未佩戴和错误佩戴的人群
-- 建议加强防疫宣传和监督管理
-
-### 3. 风险评估
-基于检测结果的风险评估：
-- **高风险**：未佩戴口罩的人员存在较高传播风险
-- **中风险**：错误佩戴口罩可能降低防护效果
-- **低风险**：正确佩戴口罩的人员防护到位
-
-### 4. 改进建议
-针对检测结果提出以下建议：
-1. **加强宣传教育**：提高公众对正确佩戴口罩的认知
-2. **设置提醒标识**：在关键区域设置口罩佩戴提醒
-3. **定期检查监督**：建立常态化的检查机制
-4. **提供口罩供应**：确保口罩的充足供应
-
-### 5. 总结
-本次AI检测分析为防疫管理提供了科学依据，建议持续监测并采取相应措施提高整体合规率。
-"""
 
 
-def generate_claude_style_analysis(prompt):
-    """生成Claude风格的分析结果（示例）"""
-    return """
-# 口罩检测智能分析报告
-
-## 核心发现
-通过深度学习算法的精确检测，我们获得了有价值的防疫合规数据。检测系统展现出良好的识别准确性，为后续的防疫决策提供了可靠的数据支撑。
-
-## 详细分析
-
-### 检测质量评估
-- 模型表现稳定，检测精度符合预期
-- 能够有效区分不同的口罩佩戴状态
-- 检测结果的置信度分布合理
-
-### 合规状况分析
-当前检测区域的防疫合规情况需要关注：
-- 正确佩戴率体现了基础防护意识
-- 错误佩戴情况提示需要改进佩戴方法
-- 未佩戴情况需要重点干预
-
-### 风险分层管理
-建议采用分层管理策略：
-1. **即时干预**：对未佩戴人员进行及时提醒
-2. **教育指导**：对错误佩戴人员提供正确指导
-3. **持续监测**：维持对整体区域的监控
-
-### 优化建议
-- 在检测点设置实时提醒系统
-- 配备专业人员进行现场指导
-- 建立数据追踪和趋势分析机制
-
-## 结论
-AI检测技术为精准防疫提供了强有力的工具，建议结合人工管理形成完整的防控体系。
-"""
 
 
-def generate_gemini_style_analysis(prompt):
-    """生成Gemini风格的分析结果（示例）"""
-    return """
-🤖 AI智能分析：口罩检测结果深度解读
-
-## 🎯 检测概览
-本次AI检测运用先进的计算机视觉技术，对目标区域进行了全面的口罩佩戴状况分析。系统通过多维度特征识别，准确判断了每个检测对象的口罩佩戴情况。
-
-## 📈 数据洞察
-
-### 技术表现
-✅ 检测算法运行稳定，识别准确率高
-✅ 多类别分类效果良好
-✅ 检测速度满足实时监控需求
-
-### 合规分析
-📊 **整体合规水平**：根据检测数据分析当前防疫执行情况
-🔍 **重点关注区域**：识别需要加强管理的薄弱环节
-📋 **改进空间**：明确提升合规率的具体方向
-
-## 🛡️ 防疫建议
-
-### 即时措施
-- 对未佩戴人员进行友善提醒
-- 为错误佩戴者提供正确示范
-- 确保口罩供应充足
-
-### 长期策略
-- 建立智能监控预警机制
-- 定期开展防疫知识培训
-- 优化检测点位布局
-
-## 🔮 趋势预测
-基于当前数据，建议持续监测合规率变化趋势，及时调整防控策略，确保防疫效果的持续性和有效性。
-
----
-*本分析报告由AI智能系统生成，结合了计算机视觉、数据分析和公共卫生专业知识*
-"""
-
-
-def generate_default_analysis(prompt):
-    """生成默认分析结果"""
-    return """
-## 口罩检测分析报告
-
-### 检测结果总结
-基于AI智能检测系统的分析，本次检测获得了详细的口罩佩戴数据。检测系统运行正常，结果可信度较高。
-
-### 主要发现
-1. **检测精度**：系统能够准确识别不同的口罩佩戴状态
-2. **数据质量**：检测结果数据完整，覆盖面广
-3. **技术稳定性**：检测过程稳定，无异常情况
-
-### 防疫建议
-- 继续保持现有的防疫措施
-- 对检测发现的问题及时处理
-- 建立长期监测机制
-
-### 后续行动
-建议根据检测结果制定针对性的改进措施，提高整体防疫合规水平。
-
----
-*报告生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
-"""

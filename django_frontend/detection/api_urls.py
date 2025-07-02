@@ -13,5 +13,6 @@ urlpatterns = [
     path('delete/<int:record_id>/', api_views.api_delete_record, name='api_delete_record'),
     path('clear-cache/', api_views.api_clear_cache, name='api_clear_cache'),
     # 大模型API
+    path('llm-models/', api_views.api_get_llm_models, name='api_get_llm_models'),
     path('llm-analysis/', api_views.api_llm_analysis, name='api_llm_analysis'),
 ]
