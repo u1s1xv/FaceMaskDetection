@@ -73,7 +73,11 @@ def index(request):
 @login_required
 def detect(request):
     """检测页面视图"""
-    form = ImageUploadForm()
+    # 从session获取默认参数
+    default_params = request.session.get('default_params', {})
+
+    # 使用默认参数初始化表单
+    form = ImageUploadForm(initial=default_params)
 
     # 只显示当前用户的最近检测记录
     recent_records = DetectionRecord.objects.filter(
@@ -322,7 +326,7 @@ def settings_view(request):
             # 保存默认参数到session
             request.session['default_params'] = form.cleaned_data
             messages.success(request, '默认参数已保存')
-            return redirect('settings')
+            return redirect('settings_view')
     else:
         # 从session加载默认参数
         initial_data = request.session.get('default_params', {})
