@@ -17,7 +17,6 @@ from datetime import datetime
 
 from .models import DetectionRecord, ModelConfig
 from .services import YOLOInferenceService
-from .pdf_utils import create_pdf_report
 
 # 大模型API配置 - 直接在这里定义，避免导入问题
 SILICONFLOW_CONFIG = {
@@ -631,70 +630,6 @@ def call_llm_api(model, prompt):
             'success': False,
             'error': f'API调用异常: {str(e)}，请重试'
         }
-
-
-@login_required
-@csrf_exempt
-@require_http_methods(["POST"])
-def api_download_pdf_report(request):
-    """API: 下载PDF分析报告"""
-    try:
-        # 解析请求数据
-        data = json.loads(request.body)
-        record_id = data.get('record_id')
-        llm_analysis = data.get('llm_analysis', '')
-
-        if not record_id:
-            return JsonResponse({'error': '缺少检测记录ID'}, status=400)
-
-        if not llm_analysis:
-            return JsonResponse({'error': '缺少AI分析内容'}, status=400)
-
-        # 获取检测记录
-        try:
-            record = DetectionRecord.objects.get(id=record_id)
-        except DetectionRecord.DoesNotExist:
-            return JsonResponse({'error': '检测记录不存在'}, status=404)
-
-        # 准备数据
-        record_data = {
-            'id': record.id,
-            'upload_time': record.upload_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'model_name': record.model_name,
-            'confidence_threshold': record.confidence_threshold,
-            'total_detections': record.total_detections,
-            'with_mask_count': record.with_mask_count,
-            'without_mask_count': record.without_mask_count,
-            'incorrect_mask_count': record.incorrect_mask_count,
-        }
-
-        # 计算合规率
-        compliance_rate = 0
-        if record.total_detections > 0:
-            compliance_rate = (record.with_mask_count / record.total_detections) * 100
-
-        detection_summary = {
-            'compliance_rate': compliance_rate
-        }
-
-        # 生成PDF
-        pdf_data = create_pdf_report(record_data, detection_summary, llm_analysis)
-
-        # 创建HTTP响应
-        response = HttpResponse(pdf_data, content_type='application/pdf')
-        filename = f'口罩检测AI分析报告_{record.id}_{int(time.time())}.pdf'
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        response['Content-Length'] = len(pdf_data)
-
-        logger.info(f"PDF报告生成成功 - 记录ID: {record_id}, 文件大小: {len(pdf_data)} bytes")
-
-        return response
-
-    except json.JSONDecodeError:
-        return JsonResponse({'error': '请求数据格式错误'}, status=400)
-    except Exception as e:
-        logger.error(f"PDF报告生成失败: {str(e)}")
-        return JsonResponse({'error': f'PDF生成失败: {str(e)}'}, status=500)
 
 
 

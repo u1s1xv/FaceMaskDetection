@@ -174,7 +174,7 @@
                                     id="downloadLLMResult"
                                     onclick="downloadLLMResult()"
                                     style="display: none;">
-                                <i class="fas fa-download"></i> 下载PDF报告
+                                <i class="fas fa-download"></i> 下载TXT报告
                             </button>
                         </div>
                     </div>
@@ -886,7 +886,7 @@ function copyLLMResult() {
     document.body.removeChild(textArea);
 }
 
-// 下载LLM分析报告 (PDF格式)
+// 下载LLM分析报告 (TXT格式)
 function downloadLLMResult() {
     if (!llmResultContent) {
         alert('暂无结果可下载');
@@ -896,72 +896,54 @@ function downloadLLMResult() {
     // 显示下载状态
     const $downloadBtn = $('#downloadLLMResult');
     const originalText = $downloadBtn.html();
-    $downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 生成PDF中...');
+    $downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 准备下载...');
 
-    // 准备请求数据
-    const requestData = {
-        record_id: {{ record.id }},
-        llm_analysis: llmResultContent
-    };
+    try {
+        // 生成文件内容
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `口罩检测AI分析报告_${timestamp}.txt`;
 
-    // 发送PDF生成请求
-    $.ajax({
-        url: '/api/download-pdf-report/',
-        type: 'POST',
-        data: JSON.stringify(requestData),
-        contentType: 'application/json',
-        headers: {
-            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
-        },
-        xhrFields: {
-            responseType: 'blob'  // 重要：设置响应类型为blob
-        },
-        timeout: 30000,  // 30秒超时
-        success: function(data, status, xhr) {
-            console.log('PDF生成成功');
+        // 构建TXT内容
+        const txtContent = `口罩检测AI分析报告
+生成时间: ${new Date().toLocaleString('zh-CN')}
+检测记录ID: {{ record.id }}
 
-            // 从响应头获取文件名
-            const contentDisposition = xhr.getResponseHeader('Content-Disposition');
-            let filename = `口罩检测AI分析报告_${new Date().getTime()}.pdf`;
+================================
+AI智能分析结果
+================================
 
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-                if (filenameMatch) {
-                    filename = filenameMatch[1];
-                }
-            }
+${llmResultContent}
 
-            // 创建下载链接
-            const blob = new Blob([data], { type: 'application/pdf' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
+================================
+报告结束
+================================
 
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+本报告由口罩检测AI系统自动生成`;
 
-            // 恢复按钮状态
-            $downloadBtn.prop('disabled', false).html(originalText);
-        },
-        error: function(xhr, status, error) {
-            console.error('PDF生成失败:', error);
+        // 创建下载链接
+        const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
 
-            let errorMessage = 'PDF生成失败，请重试';
-            if (xhr.responseJSON && xhr.responseJSON.error) {
-                errorMessage = xhr.responseJSON.error;
-            } else if (status === 'timeout') {
-                errorMessage = 'PDF生成超时，请重试';
-            }
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
 
-            alert(errorMessage);
+        console.log('TXT报告下载成功');
 
-            // 恢复按钮状态
-            $downloadBtn.prop('disabled', false).html(originalText);
-        }
-    });
+        // 恢复按钮状态
+        $downloadBtn.prop('disabled', false).html(originalText);
+
+    } catch (error) {
+        console.error('TXT报告生成失败:', error);
+        alert('TXT报告生成失败，请重试');
+
+        // 恢复按钮状态
+        $downloadBtn.prop('disabled', false).html(originalText);
+    }
 }
 
 // 页面加载完成后的初始化
