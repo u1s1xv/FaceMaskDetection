@@ -360,13 +360,15 @@ def api_llm_analysis(request):
 
         if analysis_result['success']:
             # 记录分析日志
-            logger.info(f"LLM分析成功 - 记录ID: {record_id}, 模型: {model}")
+            model_used = analysis_result.get('model_used', model)
+            api_provider = analysis_result.get('api_provider', 'SiliconFlow')
+            logger.info(f"LLM分析成功 - 记录ID: {record_id}, 请求模型: {model}, 实际使用模型: {model_used}")
 
             return JsonResponse({
                 'success': True,
                 'analysis': analysis_result['content'],
-                'model_used': analysis_result.get('model_used', model),
-                'api_provider': analysis_result.get('api_provider', 'SiliconFlow'),
+                'model_used': model_used,
+                'api_provider': api_provider,
                 'timestamp': datetime.now().isoformat()
             })
         else:
@@ -546,10 +548,13 @@ def call_llm_api(model, prompt):
     try:
         # 验证模型是否在可用列表中
         available_model_values = [m['value'] for m in AVAILABLE_MODELS]
+        logger.info(f"请求的模型: {model}, 可用模型: {available_model_values}")
         if model not in available_model_values:
+            logger.warning(f"模型 {model} 不在可用列表中，使用默认模型: {DEFAULT_MODEL}")
             model = DEFAULT_MODEL
 
         actual_model = model
+        logger.info(f"实际使用的模型: {actual_model}")
 
         # 构建API请求
         payload = {

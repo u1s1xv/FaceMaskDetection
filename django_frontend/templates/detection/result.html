@@ -2,6 +2,96 @@
 
 {% block title %}{{ page_title }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* LLM分析结果区域样式 */
+.llm-result-area {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.llm-result-area:hover {
+    border-color: #dee2e6;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.llm-result-area.has-content {
+    background-color: #ffffff;
+    border-color: #d1ecf1;
+}
+
+/* 滚动条样式 */
+.llm-result-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+.llm-result-area::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.llm-result-area::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.llm-result-area::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* LLM结果内容样式 */
+.llm-result-content {
+    line-height: 1.6;
+    color: #333;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.llm-result-success {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* AI图标动画 */
+.ai-icon-animated {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -153,7 +243,7 @@
                         </div>
 
                         <!-- 结果显示 -->
-                        <div id="llmResultArea" class="llm-result-area" style="min-height: 180px;">
+                        <div id="llmResultArea" class="llm-result-area" style="min-height: 180px; max-height: 400px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; background-color: #f8f9fa;">
                             <div class="text-center text-muted py-4">
                                 <i class="fas fa-robot fa-2x mb-3 ai-icon-animated"></i>
                                 <p>点击"开始AI分析"按钮，获取专业的智能分析结果</p>
@@ -443,21 +533,16 @@ function startLLMAnalysis() {
             $('#startLLMAnalysis').prop('disabled', false).html('<i class="fas fa-magic"></i> 开始AI分析');
 
             if (response.success) {
-                $('#llmResultArea').html(`
-                    <div class="alert alert-success">
-                        <h6><i class="fas fa-check-circle"></i> 分析完成</h6>
-                        <div style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${response.analysis}</div>
-                    </div>
-                `);
+                console.log('API响应中的model_used:', response.model_used);
+                console.log('API响应中的api_provider:', response.api_provider);
+
+                // 使用displayLLMResult函数来正确处理结果
+                displayLLMResult(response.analysis, response.model_used, response.api_provider);
                 llmResultContent = response.analysis;
-                $('#copyLLMResult, #downloadLLMResult').show();
+                currentModelUsed = response.model_used;
+                console.log('保存的模型信息:', currentModelUsed);
             } else {
-                $('#llmResultArea').html(`
-                    <div class="alert alert-danger">
-                        <h6><i class="fas fa-exclamation-triangle"></i> 分析失败</h6>
-                        <p>${response.error || '未知错误'}</p>
-                    </div>
-                `);
+                displayLLMError(response.error || '分析失败，请重试');
             }
         },
         error: function(xhr, status, error) {
@@ -768,6 +853,10 @@ function displayLLMResult(analysis, modelUsed, apiProvider) {
         </div>
     `).addClass('has-content');
 
+    // 保存结果内容和模型信息
+    llmResultContent = analysis;
+    currentModelUsed = modelUsed;
+
     // 显示操作按钮
     $copyBtn.show();
     $downloadBtn.show();
@@ -907,6 +996,9 @@ function downloadLLMResult() {
         llm_content: llmResultContent,
         model_used: currentModelUsed || null
     };
+
+    console.log('PDF下载请求数据:', requestData);
+    console.log('当前使用的模型:', currentModelUsed);
 
     // 发送PDF生成请求
     $.ajax({

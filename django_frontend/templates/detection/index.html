@@ -11,7 +11,7 @@
                 <h1 class="display-4 mb-3">
                     <i class="fas fa-mask me-3"></i>口罩检测系统
                 </h1>
-                <p class="lead mb-4">基于YOLO11深度学习模型的智能口罩佩戴检测系统</p>
+                <p class="lead mb-4">基于YOLO12深度学习模型的智能口罩佩戴检测系统</p>
                 <a href="{% url 'detect' %}" class="btn btn-light btn-lg me-3">
                     <i class="fas fa-upload"></i> 开始检测
                 </a>
@@ -32,7 +32,7 @@
                     <i class="fas fa-brain fa-3x text-primary"></i>
                 </div>
                 <h5 class="card-title">AI智能检测</h5>
-                <p class="card-text">采用最新YOLO11模型，准确识别人员口罩佩戴情况，支持多种检测场景</p>
+                <p class="card-text">采用最新YOLO12模型，准确识别人员口罩佩戴情况，支持多种检测场景</p>
             </div>
         </div>
     </div>
@@ -218,7 +218,7 @@
                 <div class="row">
                     <div class="col-6">
                         <strong>AI模型:</strong><br>
-                        <span class="text-muted">YOLO11</span>
+                        <span class="text-muted">YOLO12</span>
                     </div>
                     <div class="col-6">
                         <strong>检测类别:</strong><br>
@@ -300,14 +300,14 @@ $(document).ready(function() {
         }
     });
 
-    // 模型数据集信息饼状图（示例数据）
+    // 模型数据集信息饼状图
     const datasetCtx = document.getElementById('datasetChart').getContext('2d');
     new Chart(datasetCtx, {
         type: 'pie',
         data: {
             labels: ['训练集', '验证集', '测试集'],
             datasets: [{
-                data: [70, 20, 10],
+                data: [1145, 63, 65],
                 backgroundColor: [
                     '#007bff',
                     '#17a2b8',
