@@ -1,7 +1,7 @@
 """
 API视图
 """
-from django.http import JsonResponse, HttpResponse, StreamingHttpResponse
+from django.http import JsonResponse, HttpResponse, StreamingHttpResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
@@ -865,6 +865,46 @@ def api_batch_progress(request, session_id):
         return JsonResponse(progress_data)
 
     except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_delete_batch_session(request, session_id):
+    """API: 删除批量检测会话"""
+    try:
+        # 确保用户只能删除自己的会话，除非是管理员
+        if request.user.is_superuser:
+            session = get_object_or_404(BatchDetectionSession, id=session_id)
+        else:
+            session = get_object_or_404(BatchDetectionSession, id=session_id, user=request.user)
+
+        # 获取所有关联的检测记录
+        records = DetectionRecord.objects.filter(batch_session=session)
+
+        # 删除所有关联记录的文件
+        for record in records:
+            try:
+                if record.original_image:
+                    record.original_image.delete()
+                if record.result_image:
+                    record.result_image.delete()
+            except Exception as e:
+                logger.warning(f"删除记录 {record.id} 的文件时出错: {str(e)}")
+
+        # 删除所有关联的检测记录
+        records.delete()
+
+        # 删除批量检测会话
+        session.delete()
+
+        return JsonResponse({'success': True, 'message': '批量检测会话删除成功'})
+
+    except Http404:
+        return JsonResponse({'error': '批量检测会话不存在'}, status=404)
+    except Exception as e:
+        logger.error(f"删除批量检测会话失败: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
 

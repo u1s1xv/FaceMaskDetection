@@ -15,6 +15,7 @@ urlpatterns = [
     # 批量检测API
     path('batch-detect/', api_views.api_batch_upload_detect, name='api_batch_upload_detect'),
     path('batch-progress/<int:session_id>/', api_views.api_batch_progress, name='api_batch_progress'),
+    path('batch-session/<int:session_id>/delete/', api_views.api_delete_batch_session, name='api_delete_batch_session'),
     # 大模型API
     path('llm-models/', api_views.api_get_llm_models, name='api_get_llm_models'),
     path('llm-analysis/', api_views.api_llm_analysis, name='api_llm_analysis'),
