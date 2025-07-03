@@ -246,9 +246,12 @@
                                 <span><strong>整体进度</strong></span>
                                 <span id="overallProgressText">0/0</span>
                             </div>
-                            <div class="progress">
+                            <div class="progress mb-2">
                                 <div class="progress-bar progress-bar-striped progress-bar-animated"
                                      id="overallProgressBar" style="width: 0%"></div>
+                            </div>
+                            <div class="text-center">
+                                <small id="batchStatusText" class="text-muted">准备开始处理...</small>
                             </div>
                         </div>
 
@@ -675,7 +678,7 @@ $(document).ready(function() {
             data: formData,
             processData: false,
             contentType: false,
-            timeout: 60000,
+            timeout: 120000, // 提交请求超时时间增加到2分钟（主要用于文件上传）
             success: function(response) {
                 if (response.success) {
                     currentSessionId = response.session_id;
@@ -688,7 +691,13 @@ $(document).ready(function() {
             },
             error: function(xhr, status, error) {
                 console.error('批量检测请求失败:', error);
-                alert('批量检测提交失败，请重试');
+                let errorMsg = '批量检测提交失败';
+                if (status === 'timeout') {
+                    errorMsg = '请求超时，请检查网络连接或减少图片数量';
+                } else if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                alert(errorMsg);
                 resetBatchForm();
             }
         });
@@ -730,6 +739,7 @@ $(document).ready(function() {
         $.ajax({
             url: `/api/batch-progress/${currentSessionId}/`,
             type: 'GET',
+            timeout: 30000, // 进度查询超时时间30秒
             success: function(response) {
                 updateProgressDisplay(response);
 
@@ -739,8 +749,15 @@ $(document).ready(function() {
                     onBatchCompleted(response);
                 }
             },
-            error: function() {
-                console.error('获取进度失败');
+            error: function(xhr, status, error) {
+                console.error('获取进度失败:', error);
+
+                // 如果是超时错误，继续轮询，不中断处理
+                if (status !== 'timeout') {
+                    // 非超时错误，可能需要停止轮询
+                    console.warn('进度查询出现非超时错误，继续尝试...');
+                }
+                // 超时错误不做特殊处理，继续下次轮询
             }
         });
     }
@@ -751,6 +768,29 @@ $(document).ready(function() {
         const overallProgress = data.overall_progress || 0;
         $('#overallProgressBar').css('width', overallProgress + '%');
         $('#overallProgressText').text(`${data.completed_images + data.failed_images}/${data.total_images}`);
+
+        // 更新状态文本
+        let statusText = '';
+        switch(data.status) {
+            case 'pending':
+                statusText = '等待开始处理...';
+                break;
+            case 'processing':
+                statusText = `正在处理中... (${data.completed_images} 完成, ${data.failed_images} 失败)`;
+                break;
+            case 'completed':
+                statusText = `处理完成! 全部 ${data.completed_images} 张图片处理成功`;
+                break;
+            case 'partial_completed':
+                statusText = `处理完成! ${data.completed_images} 成功, ${data.failed_images} 失败`;
+                break;
+            case 'failed':
+                statusText = `处理失败! ${data.failed_images} 张图片处理失败`;
+                break;
+            default:
+                statusText = '状态未知';
+        }
+        $('#batchStatusText').text(statusText);
 
         // 更新单个文件状态
         if (data.records) {
@@ -766,13 +806,25 @@ $(document).ready(function() {
                         statusElement.text('等待中');
                         break;
                     case 'processing':
-                        statusElement.text('处理中');
+                        statusElement.text('处理中...');
                         break;
                     case 'completed':
-                        statusElement.text(`完成 (${record.total_detections}个检测)`);
+                        let completedText = '完成';
+                        if (record.total_detections > 0) {
+                            completedText += ` (${record.total_detections}个检测)`;
+                        }
+                        if (record.processing_time) {
+                            completedText += ` ${record.processing_time.toFixed(1)}s`;
+                        }
+                        statusElement.text(completedText);
                         break;
                     case 'failed':
-                        statusElement.text('失败');
+                        let failedText = '失败';
+                        if (record.error_message) {
+                            failedText += ` - ${record.error_message.substring(0, 30)}...`;
+                        }
+                        statusElement.text(failedText);
+                        statusElement.attr('title', record.error_message || '处理失败');
                         break;
                 }
             });
@@ -784,17 +836,39 @@ $(document).ready(function() {
         batchSubmitBtn.prop('disabled', false).html('<i class="fas fa-play"></i> 开始批量检测');
 
         // 显示完成消息
-        let message = `批量检测完成！\n`;
-        message += `总计：${data.total_images}张图片\n`;
-        message += `成功：${data.completed_images}张\n`;
-        message += `失败：${data.failed_images}张`;
+        let message = '';
+        let alertClass = 'alert-success';
 
-        alert(message);
+        if (data.status === 'completed') {
+            message = `🎉 批量检测完成！成功处理了 ${data.completed_images} 张图片。`;
+            alertClass = 'alert-success';
+        } else if (data.status === 'partial_completed') {
+            message = `⚠️ 批量检测完成！成功处理了 ${data.completed_images} 张图片，${data.failed_images} 张图片处理失败。`;
+            alertClass = 'alert-warning';
+        } else {
+            message = `❌ 批量检测失败！${data.failed_images} 张图片处理失败。`;
+            alertClass = 'alert-danger';
+        }
+
+        // 显示美化的提示消息
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <strong>${message}</strong>
+                <br><small>页面将在3秒后自动跳转到结果页面...</small>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+
+        // 在进度区域上方显示提示
+        $('#batchProgressArea').before(alertHtml);
 
         // 跳转到批量结果页面
-        if (data.session_id) {
-            window.location.href = `/app/batch-result/${data.session_id}/`;
-        }
+        setTimeout(function() {
+            const sessionId = data.session_id || currentSessionId;
+            if (sessionId) {
+                window.location.href = `/app/batch-result/${sessionId}/`;
+            }
+        }, 3000);
     }
 
     // 重置批量表单
@@ -805,4 +879,75 @@ $(document).ready(function() {
     }
 });
 </script>
+
+<style>
+/* 批量进度显示样式 */
+.batch-progress-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
+.progress-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    margin-bottom: 0.25rem;
+    background: white;
+    border-radius: 0.25rem;
+    border: 1px solid #e9ecef;
+}
+
+.progress-item .filename {
+    flex: 1;
+    font-weight: 500;
+    color: #495057;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 1rem;
+}
+
+.progress-item .status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    min-width: 80px;
+    text-align: center;
+}
+
+.progress-item .status.pending {
+    background-color: #e9ecef;
+    color: #6c757d;
+}
+
+.progress-item .status.processing {
+    background-color: #cff4fc;
+    color: #055160;
+    animation: pulse 1.5s ease-in-out infinite alternate;
+}
+
+.progress-item .status.completed {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.progress-item .status.failed {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+@keyframes pulse {
+    from { opacity: 1; }
+    to { opacity: 0.5; }
+}
+
+#batchStatusText {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+</style>
 {% endblock %}

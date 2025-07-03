@@ -786,21 +786,35 @@ def api_batch_upload_detect(request):
             )
             records.append(record)
 
-        # 启动异步批量处理（这里先用同步方式，后续可以改为Celery异步）
+        # 启动异步批量处理
         from django.utils import timezone
         session.start_time = timezone.now()
-        session.status = 'processing'
+        session.status = 'pending'  # 改为pending状态，等待异步处理
         session.save()
 
-        # 开始处理（简化版，实际应该用异步任务）
-        try:
-            process_batch_detection_sync(session.id)
-        except Exception as e:
-            logger.error(f"批量检测处理失败: {str(e)}")
-            session.status = 'failed'
-            session.error_message = str(e)
-            session.save()
-            return JsonResponse({'error': f'批量检测处理失败: {str(e)}'}, status=500)
+        # 启动异步任务处理批量检测
+        import threading
+
+        def async_process():
+            """异步处理批量检测"""
+            try:
+                # 更新状态为处理中
+                session.status = 'processing'
+                session.save()
+
+                # 执行批量处理
+                process_batch_detection_sync(session.id)
+
+            except Exception as e:
+                logger.error(f"异步批量检测处理失败: {str(e)}")
+                session.status = 'failed'
+                session.error_message = str(e)
+                session.save()
+
+        # 在新线程中启动异步处理
+        thread = threading.Thread(target=async_process)
+        thread.daemon = True
+        thread.start()
 
         return JsonResponse({
             'success': True,
@@ -855,19 +869,27 @@ def api_batch_progress(request, session_id):
 
 
 def process_batch_detection_sync(session_id):
-    """同步处理批量检测任务（简化版）"""
+    """同步处理批量检测任务"""
     try:
         session = BatchDetectionSession.objects.get(id=session_id)
+        logger.info(f"开始处理批量检测会话: {session_id}")
 
         records = DetectionRecord.objects.filter(
             batch_session=session,
             status='pending'
         ).order_by('batch_index')
 
+        total_records = records.count()
+        logger.info(f"待处理图片数量: {total_records}")
+
         inference_service = YOLOInferenceService()
+        completed_count = 0
+        failed_count = 0
 
         for record in records:
             try:
+                logger.info(f"开始处理图片 {record.batch_index + 1}/{total_records}: {record.filename}")
+
                 # 更新记录状态
                 record.status = 'processing'
                 record.save()
@@ -904,19 +926,25 @@ def process_batch_detection_sync(session_id):
                         )
 
                 record.save()
+                completed_count += 1
 
                 # 更新会话统计
                 session.completed_images += 1
                 session.save()
+
+                logger.info(f"图片处理完成 {completed_count}/{total_records}: {record.filename}")
 
             except Exception as e:
                 logger.error(f"批量检测单张图片失败 (记录ID: {record.id}): {str(e)}")
                 record.status = 'failed'
                 record.error_message = str(e)
                 record.save()
+                failed_count += 1
 
                 session.failed_images += 1
                 session.save()
+
+                logger.warning(f"图片处理失败 {failed_count}/{total_records}: {record.filename}")
 
         # 更新会话最终状态
         from django.utils import timezone
@@ -924,16 +952,21 @@ def process_batch_detection_sync(session_id):
 
         if session.failed_images == 0:
             session.status = 'completed'
+            logger.info(f"批量检测完全成功: {completed_count}/{total_records} 张图片")
         elif session.completed_images == 0:
             session.status = 'failed'
+            logger.error(f"批量检测完全失败: {failed_count}/{total_records} 张图片失败")
         else:
             session.status = 'partial_completed'
+            logger.warning(f"批量检测部分成功: {completed_count} 成功, {failed_count} 失败")
 
         # 计算总处理时间
         if session.start_time and session.end_time:
             session.total_processing_time = (session.end_time - session.start_time).total_seconds()
+            logger.info(f"批量检测总耗时: {session.total_processing_time:.2f} 秒")
 
         session.save()
+        logger.info(f"批量检测会话 {session_id} 处理完成")
 
     except Exception as e:
         logger.error(f"批量检测任务失败 (会话ID: {session_id}): {str(e)}")
