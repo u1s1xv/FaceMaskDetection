@@ -597,7 +597,7 @@ class OptimizedYOLOInferenceService:
                 cv2.rectangle(img, (x1, y1 - label_size[1] - 10),
                             (x1 + label_size[0], y1), color, -1)
                 cv2.putText(img, label, (x1, y1 - 5),
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
 
             # 转换为PIL图像并返回字节数据
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
