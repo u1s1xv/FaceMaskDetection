@@ -16,7 +16,7 @@ import time
 from datetime import datetime
 
 from .models import DetectionRecord, ModelConfig, BatchDetectionSession
-from .services import YOLOInferenceService
+from .services import YOLOInferenceService, get_optimized_inference_service, clear_inference_cache, get_cache_stats
 from .pdf_service import PDFReportService
 
 # 大模型API配置 - 直接在这里定义，避免导入问题
@@ -72,12 +72,13 @@ def api_upload_detect(request):
             )
             created_records.append(record)
 
-        # 执行检测
-        inference_service = YOLOInferenceService()
+        # 执行检测 - 使用优化的推理服务
+        inference_service = get_optimized_inference_service()
         results = []
 
         for record in created_records:
-            result = inference_service.run_inference(
+            # 使用预加载推理方法以获得最佳性能
+            result = inference_service.run_inference_with_preload(
                 image_path=record.original_image.path,
                 model_name=model_name,
                 confidence=confidence,
@@ -94,18 +95,18 @@ def api_upload_detect(request):
             record.processing_time = result['processing_time']
             record.detection_details = result['detections']
 
-            # 保存结果图像
-            if result.get('beautified_image_path'):
-                result_image = inference_service.copy_result_image(
-                    result['beautified_image_path'],
-                    record.result_image
+            # 保存结果图像 - 使用内存中的图像数据
+            if result.get('beautified_image_data'):
+                from django.core.files.base import ContentFile
+                result_image = ContentFile(
+                    result['beautified_image_data'],
+                    name=f'result_{record.id}.png'
                 )
-                if result_image:
-                    record.result_image.save(
-                        f'result_{record.id}.png',
-                        result_image,
-                        save=False
-                    )
+                record.result_image.save(
+                    f'result_{record.id}.png',
+                    result_image,
+                    save=False
+                )
 
             record.save()
 
@@ -922,7 +923,8 @@ def process_batch_detection_sync(session_id):
         total_records = records.count()
         logger.info(f"待处理图片数量: {total_records}")
 
-        inference_service = YOLOInferenceService()
+        # 使用优化的推理服务
+        inference_service = get_optimized_inference_service()
         completed_count = 0
         failed_count = 0
 
@@ -934,8 +936,8 @@ def process_batch_detection_sync(session_id):
                 record.status = 'processing'
                 record.save()
 
-                # 执行检测
-                result = inference_service.run_inference(
+                # 执行检测 - 使用预加载推理方法
+                result = inference_service.run_inference_with_preload(
                     image_path=record.original_image.path,
                     model_name=record.model_name,
                     confidence=record.confidence_threshold,
@@ -952,18 +954,18 @@ def process_batch_detection_sync(session_id):
                 record.processing_time = result['processing_time']
                 record.detection_details = result['detections']
 
-                # 保存结果图像
-                if result.get('beautified_image_path'):
-                    result_image = inference_service.copy_result_image(
-                        result['beautified_image_path'],
-                        record.result_image
+                # 保存结果图像 - 使用内存中的图像数据
+                if result.get('beautified_image_data'):
+                    from django.core.files.base import ContentFile
+                    result_image = ContentFile(
+                        result['beautified_image_data'],
+                        name=f'batch_result_{record.id}.png'
                     )
-                    if result_image:
-                        record.result_image.save(
-                            f'batch_result_{record.id}.png',
-                            result_image,
-                            save=False
-                        )
+                    record.result_image.save(
+                        f'batch_result_{record.id}.png',
+                        result_image,
+                        save=False
+                    )
 
                 record.save()
                 completed_count += 1
@@ -1017,3 +1019,45 @@ def process_batch_detection_sync(session_id):
             session.save()
         except:
             pass
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_clear_inference_cache(request):
+    """API: 清理推理缓存"""
+    try:
+        success = clear_inference_cache()
+        if success:
+            return JsonResponse({
+                'success': True,
+                'message': '缓存清理成功'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '缓存清理失败'
+            }, status=500)
+    except Exception as e:
+        logger.error(f"清理缓存API失败: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_get_cache_stats(request):
+    """API: 获取缓存统计信息"""
+    try:
+        stats = get_cache_stats()
+        return JsonResponse({
+            'success': True,
+            'data': stats
+        })
+    except Exception as e:
+        logger.error(f"获取缓存统计API失败: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)

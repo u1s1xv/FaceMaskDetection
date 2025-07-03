@@ -14,7 +14,7 @@ import logging
 
 from .models import DetectionRecord, ModelConfig, BatchDetectionSession
 from .forms import ImageUploadForm, DetectionParametersForm
-from .services import YOLOInferenceService
+from .services import YOLOInferenceService, get_optimized_inference_service
 
 logger = logging.getLogger(__name__)
 
@@ -130,9 +130,9 @@ def upload_and_detect(request):
                 )
                 created_records.append(record)
 
-                # 执行检测
-                inference_service = YOLOInferenceService()
-                result = inference_service.run_inference(
+                # 执行检测 - 使用优化的推理服务和预加载
+                inference_service = get_optimized_inference_service()
+                result = inference_service.run_inference_with_preload(
                     image_path=record.original_image.path,
                     model_name=record.model_name,
                     confidence=record.confidence_threshold,
@@ -149,18 +149,18 @@ def upload_and_detect(request):
                 record.processing_time = result['processing_time']
                 record.detection_details = result['detections']
 
-                # 保存结果图像
-                if result.get('beautified_image_path'):
-                    result_image = inference_service.copy_result_image(
-                        result['beautified_image_path'],
-                        record.result_image
+                # 保存结果图像 - 使用内存中的图像数据
+                if result.get('beautified_image_data'):
+                    from django.core.files.base import ContentFile
+                    result_image = ContentFile(
+                        result['beautified_image_data'],
+                        name=f'result_{record.id}.png'
                     )
-                    if result_image:
-                        record.result_image.save(
-                            f'result_{record.id}.png',
-                            result_image,
-                            save=False
-                        )
+                    record.result_image.save(
+                        f'result_{record.id}.png',
+                        result_image,
+                        save=False
+                    )
 
                 record.status = 'completed'
                 record.save()
