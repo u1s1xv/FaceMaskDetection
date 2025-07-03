@@ -15,7 +15,7 @@ import requests
 import time
 from datetime import datetime
 
-from .models import DetectionRecord, ModelConfig
+from .models import DetectionRecord, ModelConfig, BatchDetectionSession
 from .services import YOLOInferenceService
 from .pdf_service import PDFReportService
 
@@ -711,4 +711,236 @@ def api_download_llm_pdf(request):
         return JsonResponse({'error': f'PDF生成失败: {str(e)}'}, status=500)
 
 
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_batch_upload_detect(request):
+    """API: 批量上传图片并检测"""
+    try:
+        # 获取上传的多个文件
+        images = request.FILES.getlist('images')
+        if not images:
+            return JsonResponse({'error': '没有上传图片'}, status=400)
 
+        if len(images) > 20:
+            return JsonResponse({'error': '最多支持20张图片'}, status=400)
+
+        # 验证文件
+        max_size = 10 * 1024 * 1024  # 10MB
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp']
+
+        for image in images:
+            if image.size > max_size:
+                return JsonResponse({'error': f'文件 {image.name} 超过10MB限制'}, status=400)
+
+            # 简单的文件类型检查
+            if not any(image.name.lower().endswith(ext.split('/')[-1]) for ext in allowed_types):
+                return JsonResponse({'error': f'文件 {image.name} 格式不支持'}, status=400)
+
+        # 获取检测参数
+        session_name = request.POST.get('session_name', '').strip()
+        if not session_name:
+            from django.utils import timezone
+            session_name = f'批量检测_{timezone.now().strftime("%Y%m%d_%H%M%S")}'
+
+        model_name = request.POST.get('model_name', 'yolo11n-seg.pt')
+        confidence = float(request.POST.get('confidence', 0.25))
+        iou = float(request.POST.get('iou', 0.45))
+        imgsz = int(request.POST.get('imgsz', 640))
+
+        # 验证模型文件是否存在
+        from django.conf import settings
+        from pathlib import Path
+        model_path = settings.YOLO_MODELS_DIR / model_name
+        if not model_path.exists():
+            return JsonResponse({
+                'error': f'模型文件不存在: {model_name}。请确保模型文件位于 yoloserver/models/checkpoints/ 目录中。'
+            }, status=400)
+
+        # 创建批量检测会话
+        session = BatchDetectionSession.objects.create(
+            user=request.user,
+            session_name=session_name,
+            total_images=len(images),
+            model_name=model_name,
+            confidence_threshold=confidence,
+            iou_threshold=iou,
+            image_size=imgsz,
+            status='pending'
+        )
+
+        # 创建检测记录
+        records = []
+        for idx, image in enumerate(images):
+            record = DetectionRecord.objects.create(
+                user=request.user,
+                batch_session=session,
+                batch_index=idx,
+                is_batch_detection=True,
+                original_image=image,
+                model_name=session.model_name,
+                confidence_threshold=session.confidence_threshold,
+                iou_threshold=session.iou_threshold,
+                image_size=session.image_size,
+                status='pending'
+            )
+            records.append(record)
+
+        # 启动异步批量处理（这里先用同步方式，后续可以改为Celery异步）
+        from django.utils import timezone
+        session.start_time = timezone.now()
+        session.status = 'processing'
+        session.save()
+
+        # 开始处理（简化版，实际应该用异步任务）
+        try:
+            process_batch_detection_sync(session.id)
+        except Exception as e:
+            logger.error(f"批量检测处理失败: {str(e)}")
+            session.status = 'failed'
+            session.error_message = str(e)
+            session.save()
+            return JsonResponse({'error': f'批量检测处理失败: {str(e)}'}, status=500)
+
+        return JsonResponse({
+            'success': True,
+            'session_id': session.id,
+            'total_images': len(images),
+            'message': '批量检测已开始'
+        })
+
+    except Exception as e:
+        logger.error(f"批量检测失败: {str(e)}")
+        return JsonResponse({'error': f'批量检测失败: {str(e)}'}, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_batch_progress(request, session_id):
+    """API: 查询批量检测进度"""
+    try:
+        session = get_object_or_404(BatchDetectionSession, id=session_id, user=request.user)
+
+        # 获取所有记录的状态
+        records = DetectionRecord.objects.filter(
+            batch_session=session
+        ).order_by('batch_index')
+
+        progress_data = {
+            'session_id': session.id,
+            'session_name': session.session_name,
+            'total_images': session.total_images,
+            'completed_images': session.completed_images,
+            'failed_images': session.failed_images,
+            'status': session.status,
+            'overall_progress': session.progress_percentage,
+            'records': []
+        }
+
+        for record in records:
+            progress_data['records'].append({
+                'id': record.id,
+                'batch_index': record.batch_index,
+                'filename': record.filename,
+                'status': record.status,
+                'error_message': record.error_message,
+                'processing_time': record.processing_time,
+                'total_detections': record.total_detections
+            })
+
+        return JsonResponse(progress_data)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def process_batch_detection_sync(session_id):
+    """同步处理批量检测任务（简化版）"""
+    try:
+        session = BatchDetectionSession.objects.get(id=session_id)
+
+        records = DetectionRecord.objects.filter(
+            batch_session=session,
+            status='pending'
+        ).order_by('batch_index')
+
+        inference_service = YOLOInferenceService()
+
+        for record in records:
+            try:
+                # 更新记录状态
+                record.status = 'processing'
+                record.save()
+
+                # 执行检测
+                result = inference_service.run_inference(
+                    image_path=record.original_image.path,
+                    model_name=record.model_name,
+                    confidence=record.confidence_threshold,
+                    iou=record.iou_threshold,
+                    imgsz=record.image_size
+                )
+
+                # 更新检测结果
+                record.status = 'completed'
+                record.total_detections = result['total_detections']
+                record.with_mask_count = result['with_mask_count']
+                record.without_mask_count = result['without_mask_count']
+                record.incorrect_mask_count = result['incorrect_mask_count']
+                record.processing_time = result['processing_time']
+                record.detection_details = result['detections']
+
+                # 保存结果图像
+                if result.get('beautified_image_path'):
+                    result_image = inference_service.copy_result_image(
+                        result['beautified_image_path'],
+                        record.result_image
+                    )
+                    if result_image:
+                        record.result_image.save(
+                            f'batch_result_{record.id}.png',
+                            result_image,
+                            save=False
+                        )
+
+                record.save()
+
+                # 更新会话统计
+                session.completed_images += 1
+                session.save()
+
+            except Exception as e:
+                logger.error(f"批量检测单张图片失败 (记录ID: {record.id}): {str(e)}")
+                record.status = 'failed'
+                record.error_message = str(e)
+                record.save()
+
+                session.failed_images += 1
+                session.save()
+
+        # 更新会话最终状态
+        from django.utils import timezone
+        session.end_time = timezone.now()
+
+        if session.failed_images == 0:
+            session.status = 'completed'
+        elif session.completed_images == 0:
+            session.status = 'failed'
+        else:
+            session.status = 'partial_completed'
+
+        # 计算总处理时间
+        if session.start_time and session.end_time:
+            session.total_processing_time = (session.end_time - session.start_time).total_seconds()
+
+        session.save()
+
+    except Exception as e:
+        logger.error(f"批量检测任务失败 (会话ID: {session_id}): {str(e)}")
+        try:
+            session = BatchDetectionSession.objects.get(id=session_id)
+            session.status = 'failed'
+            session.error_message = str(e)
+            session.save()
+        except:
+            pass

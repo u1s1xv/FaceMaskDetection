@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 import os
 import re
-from .models import DetectionRecord, ModelConfig
+from .models import DetectionRecord, ModelConfig, BatchDetectionSession
 
 
 class ImageUploadForm(forms.ModelForm):
@@ -402,48 +402,61 @@ class CustomLoginForm(forms.Form):
         return password
 
 
-class MultipleImageUploadForm(forms.Form):
-    """多图片上传表单"""
-    images = forms.FileField(
-        widget=forms.FileInput(attrs={
+class BatchDetectionForm(forms.Form):
+    """批量检测表单"""
+
+    # 会话名称
+    session_name = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'accept': 'image/*',
-            'id': 'imageInput'
+            'placeholder': '批量检测会话名称（可选）'
         }),
-        required=True
+        label='会话名称',
+        help_text='为这次批量检测起一个名称，便于后续查找'
     )
+
+    # 检测参数（与单张检测保持一致）
     model_name = forms.ChoiceField(
-        choices=[],
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        initial='yolo11n-seg.pt'
+        label='检测模型',
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
+
     confidence_threshold = forms.FloatField(
-        min_value=0.1,
-        max_value=1.0,
+        label='置信度阈值',
         initial=0.25,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'min': '0.1',
-            'max': '1.0',
-            'step': '0.05'
-        })
-    )
-    iou_threshold = forms.FloatField(
         min_value=0.1,
         max_value=1.0,
-        initial=0.45,
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
             'min': '0.1',
             'max': '1.0',
             'step': '0.05'
-        })
+        }),
+        help_text='检测结果的可信程度，值越高越严格'
     )
+
+    iou_threshold = forms.FloatField(
+        label='IOU阈值',
+        initial=0.45,
+        min_value=0.1,
+        max_value=1.0,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '0.1',
+            'max': '1.0',
+            'step': '0.05'
+        }),
+        help_text='重叠检测框的过滤阈值'
+    )
+
     image_size = forms.ChoiceField(
+        label='图像尺寸',
         choices=[
             (320, '320x320 (快速)'),
             (640, '640x640 (标准)'),
-            (1280, '1280x1280 (高精度)')
+            (1280, '1280x1280 (高精度)'),
         ],
         initial=640,
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -451,54 +464,96 @@ class MultipleImageUploadForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['model_name'].choices = self._get_available_models()
+
+        # 动态加载可用模型 - 使用与单张检测相同的逻辑
+        model_choices = self._get_available_models()
+        self.fields['model_name'].choices = model_choices
 
     def _get_available_models(self):
-        """获取实际存在的模型文件"""
+        """获取实际存在的模型文件 - 与单张检测保持一致"""
         from django.conf import settings
         from pathlib import Path
 
         model_choices = []
-        models_dir = settings.YOLO_MODELS_DIR
+        models_dir = settings.YOLO_MODELS_DIR  # 指向 yoloserver/models/checkpoints
 
         if models_dir.exists():
+            # 扫描checkpoints目录下的.pt文件
             for model_file in models_dir.glob('*.pt'):
-                model_choices.append((model_file.name, model_file.name))
+                model_name = model_file.name
 
-        # 如果没有找到模型文件，提供默认选项
+                # 尝试从数据库获取模型描述
+                try:
+                    model_config = ModelConfig.objects.filter(
+                        name=model_name,
+                        is_active=True
+                    ).first()
+
+                    if model_config:
+                        description = model_config.description
+                    else:
+                        # 根据文件名生成描述
+                        description = self._generate_model_description(model_name)
+
+                    model_choices.append((model_name, f"{model_name} - {description}"))
+
+                except Exception:
+                    # 如果数据库查询失败，使用默认描述
+                    description = self._generate_model_description(model_name)
+                    model_choices.append((model_name, f"{model_name} - {description}"))
+
+        # 如果没有找到任何模型文件，提供默认选项
         if not model_choices:
             model_choices = [
-                ('yolo11n-seg.pt', 'YOLOv11n-seg (轻量级)'),
-                ('yolo11s-seg.pt', 'YOLOv11s-seg (小型)'),
-                ('yolo11m-seg.pt', 'YOLOv11m-seg (中型)'),
-                ('yolo11l-seg.pt', 'YOLOv11l-seg (大型)'),
-                ('yolo11x-seg.pt', 'YOLOv11x-seg (超大型)')
+                ('yolo11n-seg.pt', 'YOLO11n-seg.pt - 默认模型（请确保文件存在）'),
             ]
 
+        # 按文件名排序
+        model_choices.sort(key=lambda x: x[0])
         return model_choices
 
-    def clean_images(self):
-        """验证上传的图片文件"""
-        files = self.files.getlist('images')
+    def _generate_model_description(self, model_name):
+        """根据模型文件名生成描述 - 与单张检测保持一致"""
+        name_lower = model_name.lower()
 
-        if not files:
-            raise ValidationError('请选择要上传的图片')
+        if 'yolo11n' in name_lower:
+            return 'YOLO11 Nano - 快速检测'
+        elif 'yolo11s' in name_lower:
+            return 'YOLO11 Small - 平衡性能'
+        elif 'yolo11m' in name_lower:
+            return 'YOLO11 Medium - 高精度'
+        elif 'yolo11l' in name_lower:
+            return 'YOLO11 Large - 超高精度'
+        elif 'yolo11x' in name_lower:
+            return 'YOLO11 XLarge - 最高精度'
+        elif 'seg' in name_lower:
+            return '分割模型'
+        elif 'det' in name_lower:
+            return '检测模型'
+        else:
+            return '自定义模型'
 
-        if len(files) > 10:  # 限制最多10张图片
-            raise ValidationError('最多只能同时上传10张图片')
+    def clean_session_name(self):
+        """验证会话名称"""
+        session_name = self.cleaned_data.get('session_name', '').strip()
 
-        for file in files:
-            # 检查文件大小
-            if file.size > settings.MAX_IMAGE_SIZE:
-                raise ValidationError(
-                    f'图片文件 {file.name} 过大，最大支持 {settings.MAX_IMAGE_SIZE // (1024*1024)}MB'
-                )
+        # 如果没有提供名称，生成默认名称
+        if not session_name:
+            from django.utils import timezone
+            session_name = f'批量检测_{timezone.now().strftime("%Y%m%d_%H%M%S")}'
 
-            # 检查文件扩展名
-            ext = os.path.splitext(file.name)[1].lower()
-            if ext not in settings.ALLOWED_IMAGE_EXTENSIONS:
-                raise ValidationError(
-                    f'图片 {file.name} 格式不支持，支持的格式: {", ".join(settings.ALLOWED_IMAGE_EXTENSIONS)}'
-                )
+        return session_name
 
-        return files
+    def clean_confidence_threshold(self):
+        """验证置信度阈值"""
+        confidence = self.cleaned_data.get('confidence_threshold')
+        if confidence is not None and (confidence < 0.1 or confidence > 1.0):
+            raise ValidationError('置信度阈值必须在0.1到1.0之间')
+        return confidence
+
+    def clean_iou_threshold(self):
+        """验证IOU阈值"""
+        iou = self.cleaned_data.get('iou_threshold')
+        if iou is not None and (iou < 0.1 or iou > 1.0):
+            raise ValidationError('IOU阈值必须在0.1到1.0之间')
+        return iou

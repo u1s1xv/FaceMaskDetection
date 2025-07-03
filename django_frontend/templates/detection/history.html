@@ -103,19 +103,25 @@
                         <!-- 检测信息 -->
                         <div class="mb-3">
                             <div class="row text-center">
-                                <div class="col-4">
+                                <div class="col-3">
                                     <div class="border-end">
                                         <strong class="text-primary">{{ record.total_detections }}</strong>
                                         <br><small class="text-muted">总数</small>
                                     </div>
                                 </div>
-                                <div class="col-4">
+                                <div class="col-3">
                                     <div class="border-end">
                                         <strong class="text-success">{{ record.with_mask_count }}</strong>
                                         <br><small class="text-muted">正确</small>
                                     </div>
                                 </div>
-                                <div class="col-4">
+                                <div class="col-3">
+                                    <div class="border-end">
+                                        <strong class="text-warning">{{ record.incorrect_mask_count }}</strong>
+                                        <br><small class="text-muted">错误</small>
+                                    </div>
+                                </div>
+                                <div class="col-3">
                                     <strong class="text-danger">{{ record.without_mask_count }}</strong>
                                     <br><small class="text-muted">未戴</small>
                                 </div>

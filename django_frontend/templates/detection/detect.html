@@ -3,10 +3,36 @@
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
+<!-- 检测模式选择器 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-search"></i> 口罩检测
+                    </h4>
+                    <div class="btn-group" role="group" aria-label="检测模式">
+                        <input type="radio" class="btn-check" name="detectionMode" id="singleMode" value="single" checked>
+                        <label class="btn btn-outline-primary" for="singleMode">
+                            <i class="fas fa-image"></i> 单张检测
+                        </label>
+                        <input type="radio" class="btn-check" name="detectionMode" id="batchMode" value="batch">
+                        <label class="btn btn-outline-primary" for="batchMode">
+                            <i class="fas fa-images"></i> 批量检测
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <!-- 上传区域 -->
     <div class="col-lg-8">
-        <div class="card">
+        <!-- 单张检测卡片 -->
+        <div class="card" id="singleDetectionCard">
             <div class="card-header">
                 <h5 class="card-title mb-0">
                     <i class="fas fa-upload"></i> 上传图片进行口罩检测
@@ -115,8 +141,129 @@
                 </form>
             </div>
         </div>
+
+        <!-- 批量检测卡片 -->
+        <div class="card" id="batchDetectionCard" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-images"></i> 批量上传图片进行检测
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="batchUploadForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <!-- 会话名称 -->
+                    <div class="mb-3">
+                        <label for="batchSessionName" class="form-label">会话名称（可选）</label>
+                        <input type="text" class="form-control" id="batchSessionName"
+                               placeholder="为这次批量检测起一个名称">
+                        <div class="form-text">便于后续查找和管理</div>
+                    </div>
+
+                    <!-- 批量上传区域 -->
+                    <div class="upload-area-batch" id="batchUploadArea">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                        <h5>拖拽多张图片到此处或点击选择文件</h5>
+                        <p class="text-muted">支持同时选择多张图片，最多20张，每张最大10MB</p>
+                        <input type="file" id="batchImageInput" multiple accept="image/*" style="display: none;">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('batchImageInput').click()">
+                            <i class="fas fa-folder-open"></i> 选择图片
+                        </button>
+                    </div>
+
+                    <!-- 多图片预览区域 -->
+                    <div id="batchPreviewArea" class="batch-preview-container mt-3" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">已选择图片 (<span id="selectedCount">0</span>/20)</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="clearAllBtn">
+                                <i class="fas fa-trash"></i> 清空所有
+                            </button>
+                        </div>
+                        <div class="preview-grid" id="previewGrid">
+                            <!-- 动态生成预览项 -->
+                        </div>
+                    </div>
+
+                    <!-- 批量检测参数 -->
+                    <div class="row mt-4" id="batchParametersSection" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="batchModelName" class="form-label">检测模型</label>
+                                <select class="form-select" id="batchModelName">
+                                    {% for model in available_models %}
+                                    <option value="{{ model.name }}"{% if forloop.first %} selected{% endif %}>
+                                        {{ model.display_name }}
+                                    </option>
+                                    {% empty %}
+                                    <option value="yolo11n-seg.pt">YOLO11n-seg.pt - 默认模型（请确保文件存在）</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="batchImageSize" class="form-label">图像尺寸</label>
+                                <select class="form-select" id="batchImageSize">
+                                    <option value="320">320x320 (快速)</option>
+                                    <option value="640" selected>640x640 (标准)</option>
+                                    <option value="1280">1280x1280 (高精度)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" id="batchThresholdsSection" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="batchConfidence" class="form-label">置信度阈值</label>
+                                <input type="number" class="form-control" id="batchConfidence"
+                                       value="0.25" min="0.1" max="1.0" step="0.05">
+                                <div class="form-text">检测结果的可信程度</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="batchIou" class="form-label">IOU阈值</label>
+                                <input type="number" class="form-control" id="batchIou"
+                                       value="0.45" min="0.1" max="1.0" step="0.05">
+                                <div class="form-text">重叠检测框的过滤</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 提交按钮 -->
+                    <div class="d-grid" id="batchSubmitSection" style="display: none;">
+                        <button type="submit" class="btn btn-primary btn-lg" id="batchSubmitBtn">
+                            <i class="fas fa-play"></i> 开始批量检测
+                        </button>
+                    </div>
+
+                    <!-- 批量进度显示 -->
+                    <div id="batchProgressArea" class="batch-progress-container mt-3" style="display: none;">
+                        <div class="overall-progress mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span><strong>整体进度</strong></span>
+                                <span id="overallProgressText">0/0</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                     id="overallProgressBar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="individual-progress">
+                            <h6>处理详情</h6>
+                            <div id="individualProgressList" class="progress-list">
+                                <!-- 动态生成单张图片进度 -->
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    
+
     <!-- 侧边栏 -->
     <div class="col-lg-4">
         <!-- 检测说明 -->
@@ -213,14 +360,69 @@
 {% load static %}
 <script>
 $(document).ready(function() {
-    // 动态添加multiple属性
-    $('#id_original_image').attr('multiple', true);
+    // 单张检测相关元素
+    const uploadArea = $('#uploadArea');
+    const fileInput = $('#imageInput');
+    const imagePreview = $('#imagePreview');
+    const previewImg = $('#previewImg');
+    const uploadForm = $('#uploadForm');
+    const submitBtn = $('#submitBtn');
+    const progressContainer = $('.progress-container');
 
-    // 文件选择变化处理
-    $('#id_original_image').on('change', function() {
-        const files = this.files;
-        console.log('选择了', files.length, '个文件');
+    // 批量检测相关元素
+    const batchUploadArea = $('#batchUploadArea');
+    const batchImageInput = $('#batchImageInput');
+    const batchPreviewArea = $('#batchPreviewArea');
+    const previewGrid = $('#previewGrid');
+    const selectedCount = $('#selectedCount');
+    const clearAllBtn = $('#clearAllBtn');
+    const batchUploadForm = $('#batchUploadForm');
+    const batchSubmitBtn = $('#batchSubmitBtn');
+    const batchProgressArea = $('#batchProgressArea');
 
+    // 模式切换相关元素
+    const singleModeRadio = $('#singleMode');
+    const batchModeRadio = $('#batchMode');
+    const singleDetectionCard = $('#singleDetectionCard');
+    const batchDetectionCard = $('#batchDetectionCard');
+
+    // 批量检测状态变量
+    let selectedFiles = [];
+    let currentSessionId = null;
+    let progressInterval = null;
+
+    // 模式切换功能
+    function switchDetectionMode(mode) {
+        if (mode === 'single') {
+            singleDetectionCard.show();
+            batchDetectionCard.hide();
+        } else if (mode === 'batch') {
+            singleDetectionCard.hide();
+            batchDetectionCard.show();
+        }
+    }
+
+    // 监听模式切换
+    $('input[name="detectionMode"]').on('change', function() {
+        switchDetectionMode($(this).val());
+    });
+    
+    // 拖拽上传功能
+    uploadArea.on('dragover', function(e) {
+        e.preventDefault();
+        $(this).addClass('dragover');
+    });
+    
+    uploadArea.on('dragleave', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+    });
+    
+    uploadArea.on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+        
+        const files = e.originalEvent.dataTransfer.files;
         if (files.length > 0) {
             // 显示预览
             showFilePreview(files);
@@ -271,6 +473,335 @@ $(document).ready(function() {
             multiplePreview.show();
             imagePreview.fadeIn();
         }
+    }
+    
+    // 表单提交
+    uploadForm.on('submit', function() {
+        if (!fileInput[0].files.length) {
+            alert('请先选择要检测的图片');
+            return false;
+        }
+        
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 检测中...');
+        progressContainer.show();
+        
+        // 模拟进度条
+        let progress = 0;
+        const progressBar = $('.progress-bar');
+        const progressText = $('#progressText');
+        
+        const interval = setInterval(function() {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            
+            progressBar.css('width', progress + '%');
+            
+            if (progress < 30) {
+                progressText.text('正在上传图片...');
+            } else if (progress < 60) {
+                progressText.text('正在加载AI模型...');
+            } else {
+                progressText.text('正在进行检测分析...');
+            }
+        }, 500);
+        
+        // 清理定时器（实际提交后会跳转页面）
+        setTimeout(function() {
+            clearInterval(interval);
+        }, 30000);
+    });
+
+    // ==================== 批量检测功能 ====================
+
+    // 批量文件选择处理
+    batchImageInput.on('change', function() {
+        const files = Array.from(this.files);
+        handleBatchFiles(files);
+    });
+
+    // 批量拖拽上传功能
+    batchUploadArea.on('dragover', function(e) {
+        e.preventDefault();
+        $(this).addClass('dragover');
+    });
+
+    batchUploadArea.on('dragleave', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+    });
+
+    batchUploadArea.on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+
+        const files = Array.from(e.originalEvent.dataTransfer.files);
+        handleBatchFiles(files);
+    });
+
+    // 点击上传区域
+    batchUploadArea.on('click', function() {
+        batchImageInput.click();
+    });
+
+    // 处理批量文件
+    function handleBatchFiles(files) {
+        // 过滤图片文件
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
+
+        if (imageFiles.length === 0) {
+            alert('请选择有效的图片文件');
+            return;
+        }
+
+        // 检查文件数量限制
+        if (selectedFiles.length + imageFiles.length > 20) {
+            alert(`最多只能选择20张图片，当前已选择${selectedFiles.length}张`);
+            return;
+        }
+
+        // 检查文件大小
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        const oversizedFiles = imageFiles.filter(file => file.size > maxSize);
+        if (oversizedFiles.length > 0) {
+            alert(`以下文件超过10MB限制：\n${oversizedFiles.map(f => f.name).join('\n')}`);
+            return;
+        }
+
+        // 添加到选中文件列表
+        imageFiles.forEach(file => {
+            if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+                selectedFiles.push(file);
+            }
+        });
+
+        updateBatchPreview();
+        updateBatchUI();
+    }
+
+    // 更新批量预览
+    function updateBatchPreview() {
+        previewGrid.empty();
+        selectedCount.text(selectedFiles.length);
+
+        selectedFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewItem = $(`
+                    <div class="preview-item" data-index="${index}">
+                        <img src="${e.target.result}" alt="${file.name}">
+                        <div class="preview-info">
+                            <div class="filename">${file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name}</div>
+                            <div class="filesize">${(file.size / 1024 / 1024).toFixed(1)}MB</div>
+                        </div>
+                        <button type="button" class="remove-btn" onclick="removeBatchFile(${index})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `);
+                previewGrid.append(previewItem);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        if (selectedFiles.length > 0) {
+            batchPreviewArea.show();
+        } else {
+            batchPreviewArea.hide();
+        }
+    }
+
+    // 移除批量文件
+    window.removeBatchFile = function(index) {
+        selectedFiles.splice(index, 1);
+        updateBatchPreview();
+        updateBatchUI();
+    };
+
+    // 清空所有文件
+    clearAllBtn.on('click', function() {
+        selectedFiles = [];
+        updateBatchPreview();
+        updateBatchUI();
+    });
+
+    // 更新批量检测UI状态
+    function updateBatchUI() {
+        if (selectedFiles.length > 0) {
+            $('#batchParametersSection').show();
+            $('#batchThresholdsSection').show();
+            $('#batchSubmitSection').show();
+        } else {
+            $('#batchParametersSection').hide();
+            $('#batchThresholdsSection').hide();
+            $('#batchSubmitSection').hide();
+        }
+    }
+
+    // 批量表单提交
+    batchUploadForm.on('submit', function(e) {
+        e.preventDefault();
+
+        if (selectedFiles.length === 0) {
+            alert('请先选择要检测的图片');
+            return;
+        }
+
+        startBatchDetection();
+    });
+
+    // 开始批量检测
+    function startBatchDetection() {
+        // 禁用提交按钮
+        batchSubmitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 正在提交...');
+
+        // 准备表单数据
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', $('[name=csrfmiddlewaretoken]').val());
+        formData.append('session_name', $('#batchSessionName').val() || '');
+        formData.append('model_name', $('#batchModelName').val());
+        formData.append('confidence', $('#batchConfidence').val());
+        formData.append('iou', $('#batchIou').val());
+        formData.append('imgsz', $('#batchImageSize').val());
+
+        // 添加所有选中的文件
+        selectedFiles.forEach((file, index) => {
+            formData.append('images', file);
+        });
+
+        // 发送批量检测请求
+        $.ajax({
+            url: '/api/batch-detect/',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            timeout: 60000,
+            success: function(response) {
+                if (response.success) {
+                    currentSessionId = response.session_id;
+                    showBatchProgress();
+                    startProgressPolling();
+                } else {
+                    alert('批量检测提交失败：' + (response.error || '未知错误'));
+                    resetBatchForm();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('批量检测请求失败:', error);
+                alert('批量检测提交失败，请重试');
+                resetBatchForm();
+            }
+        });
+    }
+
+    // 显示批量进度
+    function showBatchProgress() {
+        batchProgressArea.show();
+        $('#batchSubmitSection').hide();
+
+        // 初始化进度显示
+        const progressList = $('#individualProgressList');
+        progressList.empty();
+
+        selectedFiles.forEach((file, index) => {
+            const progressItem = $(`
+                <div class="progress-item" data-index="${index}">
+                    <div class="filename">${file.name}</div>
+                    <div class="status pending">等待中</div>
+                </div>
+            `);
+            progressList.append(progressItem);
+        });
+    }
+
+    // 开始进度轮询
+    function startProgressPolling() {
+        if (!currentSessionId) return;
+
+        progressInterval = setInterval(function() {
+            checkBatchProgress();
+        }, 2000); // 每2秒检查一次进度
+    }
+
+    // 检查批量进度
+    function checkBatchProgress() {
+        if (!currentSessionId) return;
+
+        $.ajax({
+            url: `/api/batch-progress/${currentSessionId}/`,
+            type: 'GET',
+            success: function(response) {
+                updateProgressDisplay(response);
+
+                // 检查是否完成
+                if (response.status === 'completed' || response.status === 'partial_completed' || response.status === 'failed') {
+                    clearInterval(progressInterval);
+                    onBatchCompleted(response);
+                }
+            },
+            error: function() {
+                console.error('获取进度失败');
+            }
+        });
+    }
+
+    // 更新进度显示
+    function updateProgressDisplay(data) {
+        // 更新整体进度
+        const overallProgress = data.overall_progress || 0;
+        $('#overallProgressBar').css('width', overallProgress + '%');
+        $('#overallProgressText').text(`${data.completed_images + data.failed_images}/${data.total_images}`);
+
+        // 更新单个文件状态
+        if (data.records) {
+            data.records.forEach(record => {
+                const progressItem = $(`.progress-item[data-index="${record.batch_index}"]`);
+                const statusElement = progressItem.find('.status');
+
+                statusElement.removeClass('pending processing completed failed');
+                statusElement.addClass(record.status);
+
+                switch (record.status) {
+                    case 'pending':
+                        statusElement.text('等待中');
+                        break;
+                    case 'processing':
+                        statusElement.text('处理中');
+                        break;
+                    case 'completed':
+                        statusElement.text(`完成 (${record.total_detections}个检测)`);
+                        break;
+                    case 'failed':
+                        statusElement.text('失败');
+                        break;
+                }
+            });
+        }
+    }
+
+    // 批量检测完成
+    function onBatchCompleted(data) {
+        batchSubmitBtn.prop('disabled', false).html('<i class="fas fa-play"></i> 开始批量检测');
+
+        // 显示完成消息
+        let message = `批量检测完成！\n`;
+        message += `总计：${data.total_images}张图片\n`;
+        message += `成功：${data.completed_images}张\n`;
+        message += `失败：${data.failed_images}张`;
+
+        alert(message);
+
+        // 跳转到批量结果页面
+        if (data.session_id) {
+            window.location.href = `/app/batch-result/${data.session_id}/`;
+        }
+    }
+
+    // 重置批量表单
+    function resetBatchForm() {
+        batchSubmitBtn.prop('disabled', false).html('<i class="fas fa-play"></i> 开始批量检测');
+        batchProgressArea.hide();
+        $('#batchSubmitSection').show();
     }
 });
 </script>
