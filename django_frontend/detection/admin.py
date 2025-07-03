@@ -4,7 +4,7 @@ Django管理后台配置
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
-from .models import DetectionRecord, ModelConfig, UserProfile, LoginAttempt
+from .models import DetectionRecord, ModelConfig, UserProfile, LoginAttempt, BatchDetectionSession
 
 
 @admin.register(DetectionRecord)
@@ -16,6 +16,9 @@ class DetectionRecordAdmin(admin.ModelAdmin):
         'user',
         'upload_time',
         'model_name',
+        'is_batch_detection',
+        'batch_session',
+        'batch_index',
         'total_detections',
         'with_mask_count',
         'without_mask_count',
@@ -25,10 +28,12 @@ class DetectionRecordAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         'status',
+        'is_batch_detection',
         'user',
         'model_name',
         'upload_time',
-        'confidence_threshold'
+        'confidence_threshold',
+        'batch_session'
     ]
     search_fields = ['id', 'model_name', 'user__username']
     readonly_fields = [
@@ -42,14 +47,18 @@ class DetectionRecordAdmin(admin.ModelAdmin):
         ('基本信息', {
             'fields': ('user', 'original_image', 'result_image', 'upload_time', 'status', 'error_message')
         }),
+        ('批量检测信息', {
+            'fields': ('is_batch_detection', 'batch_session', 'batch_index'),
+            'classes': ('collapse',)
+        }),
         ('检测参数', {
             'fields': ('model_name', 'confidence_threshold', 'iou_threshold', 'image_size')
         }),
         ('检测结果', {
             'fields': (
-                'total_detections', 
-                'with_mask_count', 
-                'without_mask_count', 
+                'total_detections',
+                'with_mask_count',
+                'without_mask_count',
                 'incorrect_mask_count',
                 'processing_time'
             )
@@ -160,6 +169,81 @@ class UserProfileInline(admin.StackedInline):
 
 class CustomUserAdmin(UserAdmin):
     inlines = (UserProfileInline,)
+
+
+@admin.register(BatchDetectionSession)
+class BatchDetectionSessionAdmin(admin.ModelAdmin):
+    """批量检测会话管理"""
+
+    list_display = [
+        'id',
+        'session_name',
+        'user',
+        'total_images',
+        'completed_images',
+        'failed_images',
+        'progress_percentage',
+        'status',
+        'created_time'
+    ]
+    list_filter = [
+        'status',
+        'user',
+        'created_time',
+        'model_name'
+    ]
+    search_fields = ['session_name', 'user__username']
+    readonly_fields = [
+        'created_time',
+        'updated_time',
+        'start_time',
+        'end_time',
+        'total_processing_time',
+        'progress_percentage',
+        'success_rate'
+    ]
+    list_per_page = 20
+
+    fieldsets = (
+        ('基本信息', {
+            'fields': ('user', 'session_name', 'created_time', 'updated_time', 'status', 'error_message')
+        }),
+        ('统计信息', {
+            'fields': ('total_images', 'completed_images', 'failed_images', 'progress_percentage', 'success_rate')
+        }),
+        ('检测参数', {
+            'fields': ('model_name', 'confidence_threshold', 'iou_threshold', 'image_size')
+        }),
+        ('时间信息', {
+            'fields': ('start_time', 'end_time', 'total_processing_time'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def progress_percentage(self, obj):
+        """显示进度百分比"""
+        return f"{obj.progress_percentage}%"
+    progress_percentage.short_description = '进度'
+
+    def success_rate(self, obj):
+        """显示成功率"""
+        return f"{obj.success_rate}%"
+    success_rate.short_description = '成功率'
+
+
+class DetectionRecordInline(admin.TabularInline):
+    """检测记录内联显示"""
+    model = DetectionRecord
+    extra = 0
+    readonly_fields = ['upload_time', 'status', 'total_detections', 'processing_time']
+    fields = ['batch_index', 'original_image', 'status', 'total_detections', 'processing_time']
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+# 将内联添加到BatchDetectionSessionAdmin
+BatchDetectionSessionAdmin.inlines = [DetectionRecordInline]
 
 
 # 重新注册User模型

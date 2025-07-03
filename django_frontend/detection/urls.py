@@ -21,6 +21,10 @@ urlpatterns = [
     path('models/', views.model_management, name='model_management'),
     path('settings/', views.settings_view, name='settings_view'),
 
+    # 批量检测相关
+    path('batch-result/<int:session_id>/', views.batch_result, name='batch_result'),
+    path('batch-history/', views.batch_history, name='batch_history'),
+
     # 操作
     path('delete/<int:record_id>/', views.delete_record, name='delete_record'),
     path('status/<int:record_id>/', views.get_detection_status, name='detection_status'),

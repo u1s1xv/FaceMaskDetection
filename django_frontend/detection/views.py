@@ -12,7 +12,7 @@ from django.db.models import Q, Sum
 import json
 import logging
 
-from .models import DetectionRecord, ModelConfig
+from .models import DetectionRecord, ModelConfig, BatchDetectionSession
 from .forms import ImageUploadForm, DetectionParametersForm
 from .services import YOLOInferenceService
 
@@ -85,9 +85,13 @@ def detect(request):
         status='completed'
     ).order_by('-upload_time')[:5]
 
+    # 获取可用的模型列表用于批量检测
+    available_models = _get_available_models()
+
     context = {
         'form': form,
         'recent_records': recent_records,
+        'available_models': available_models,
         'page_title': '图片检测'
     }
     return render(request, 'detection/detect.html', context)
@@ -364,3 +368,183 @@ def get_detection_status(request, record_id):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def batch_result(request, session_id):
+    """批量检测结果页面"""
+    # 确保用户只能查看自己的批量检测会话，除非是管理员
+    if request.user.is_superuser:
+        session = get_object_or_404(BatchDetectionSession, id=session_id)
+    else:
+        session = get_object_or_404(BatchDetectionSession, id=session_id, user=request.user)
+
+    # 获取所有检测记录
+    records = DetectionRecord.objects.filter(
+        batch_session=session
+    ).order_by('batch_index')
+
+    # 分页处理
+    paginator = Paginator(records, 12)  # 每页显示12个结果
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # 计算统计数据
+    completed_records = records.filter(status='completed')
+    batch_stats = {
+        'total_images': session.total_images,
+        'completed_images': session.completed_images,
+        'failed_images': session.failed_images,
+        'success_rate': session.success_rate,
+        'total_detections': sum(record.total_detections for record in completed_records),
+        'total_with_mask': sum(record.with_mask_count for record in completed_records),
+        'total_without_mask': sum(record.without_mask_count for record in completed_records),
+        'total_incorrect_mask': sum(record.incorrect_mask_count for record in completed_records),
+    }
+
+    # 计算整体合规率
+    if batch_stats['total_detections'] > 0:
+        batch_stats['overall_compliance_rate'] = round(
+            (batch_stats['total_with_mask'] / batch_stats['total_detections'] * 100), 2
+        )
+    else:
+        batch_stats['overall_compliance_rate'] = 0
+
+    context = {
+        'session': session,
+        'page_obj': page_obj,
+        'batch_stats': batch_stats,
+        'page_title': f'批量检测结果 - {session.session_name}'
+    }
+
+    return render(request, 'detection/batch_result.html', context)
+
+
+@login_required
+def batch_history(request):
+    """批量检测历史页面"""
+    # 根据用户权限获取数据
+    if request.user.is_superuser:
+        # 管理员可以查看所有数据，但默认显示自己的数据
+        show_all = request.GET.get('show_all') == 'true'
+        if show_all:
+            queryset = BatchDetectionSession.objects.all()
+            stats_label = "全站数据"
+        else:
+            queryset = BatchDetectionSession.objects.filter(user=request.user)
+            stats_label = "我的数据"
+    else:
+        # 普通用户只能看到自己的数据
+        queryset = BatchDetectionSession.objects.filter(user=request.user)
+        stats_label = "我的数据"
+        show_all = False
+
+    # 搜索和筛选
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '')
+
+    if search_query:
+        queryset = queryset.filter(
+            Q(session_name__icontains=search_query) |
+            Q(id__icontains=search_query)
+        )
+
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+
+    # 分页
+    paginator = Paginator(queryset.order_by('-created_time'), 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # 状态选择
+    status_choices = BatchDetectionSession.STATUS_CHOICES
+
+    context = {
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'status_choices': status_choices,
+        'stats_label': stats_label,
+        'is_superuser': request.user.is_superuser,
+        'show_all': show_all,
+        'page_title': '批量检测历史'
+    }
+
+    return render(request, 'detection/batch_history.html', context)
+
+
+def _get_available_models():
+    """获取实际存在的模型文件 - 与表单逻辑保持一致"""
+    from django.conf import settings
+    from pathlib import Path
+
+    model_choices = []
+    models_dir = settings.YOLO_MODELS_DIR  # 指向 yoloserver/models/checkpoints
+
+    if models_dir.exists():
+        # 扫描checkpoints目录下的.pt文件
+        for model_file in models_dir.glob('*.pt'):
+            model_name = model_file.name
+
+            # 尝试从数据库获取模型描述
+            try:
+                model_config = ModelConfig.objects.filter(
+                    name=model_name,
+                    is_active=True
+                ).first()
+
+                if model_config:
+                    description = model_config.description
+                else:
+                    # 根据文件名生成描述
+                    description = _generate_model_description(model_name)
+
+                model_choices.append({
+                    'name': model_name,
+                    'description': description,
+                    'display_name': f"{model_name} - {description}"
+                })
+
+            except Exception:
+                # 如果数据库查询失败，使用默认描述
+                description = _generate_model_description(model_name)
+                model_choices.append({
+                    'name': model_name,
+                    'description': description,
+                    'display_name': f"{model_name} - {description}"
+                })
+
+    # 如果没有找到任何模型文件，提供默认选项
+    if not model_choices:
+        model_choices = [{
+            'name': 'yolo11n-seg.pt',
+            'description': '默认模型（请确保文件存在）',
+            'display_name': 'YOLO11n-seg.pt - 默认模型（请确保文件存在）'
+        }]
+
+    # 按文件名排序
+    model_choices.sort(key=lambda x: x['name'])
+    return model_choices
+
+
+def _generate_model_description(model_name):
+    """根据模型文件名生成描述"""
+    name_lower = model_name.lower()
+
+    if 'yolo11n' in name_lower:
+        return 'YOLO11 Nano - 快速检测'
+    elif 'yolo11s' in name_lower:
+        return 'YOLO11 Small - 平衡性能'
+    elif 'yolo11m' in name_lower:
+        return 'YOLO11 Medium - 高精度'
+    elif 'yolo11l' in name_lower:
+        return 'YOLO11 Large - 超高精度'
+    elif 'yolo11x' in name_lower:
+        return 'YOLO11 XLarge - 最高精度'
+    elif 'seg' in name_lower:
+        return '分割模型'
+    elif 'det' in name_lower:
+        return '检测模型'
+    else:
+        return '自定义模型'
