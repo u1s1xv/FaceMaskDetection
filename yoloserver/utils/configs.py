@@ -299,6 +299,14 @@ DEFAULT_INFER_CONFIG = {
     'line_width': 8,  # 指定边界框的线宽（None 为自动调整）
     'visualize': False,  # 在推理过程中激活模型特征的可视化
     'verbose': True,  # 控制是否在终端显示详细的推理日志
+
+    # 美化参数
+    'beautify': True,  # 启用美化绘制（圆角标签、中文支持）
+    'use_chinese_mapping': True,  # 启用中文标签映射
+    'font_size': 22,  # 美化字体大小（720p基准）
+    'label_padding_x': 30,  # 美化标签水平内边距
+    'label_padding_y': 18,  # 美化标签垂直内边距
+    'radius': 8,  # 美化圆角半径
 }
 
 # 带注释的验证配置

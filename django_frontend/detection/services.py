@@ -151,6 +151,8 @@ class YOLOInferenceService:
                 cwd=str(self.yolo_root),
                 capture_output=True,
                 text=True,
+                encoding='utf-8',  # 显式指定UTF-8编码，避免Windows系统默认GBK编码导致的解码错误
+                errors='replace',  # 使用replace错误处理策略，避免解码错误导致程序崩溃
                 timeout=300  # 5分钟超时
             )
             

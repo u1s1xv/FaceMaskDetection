@@ -97,6 +97,8 @@ def _get_nvidia_driver_version(logger: logging.Logger):
             ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
             capture_output=True,
             text=True,  # Decode stdout/stderr as text
+            encoding='utf-8',  # 显式指定UTF-8编码，避免Windows系统默认GBK编码导致的解码错误
+            errors='replace',  # 使用replace错误处理策略，避免解码错误导致程序崩溃
             check=True,  # Raise CalledProcessError for non-zero exit codes
             # Prevent console window from popping up on Windows
             creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0

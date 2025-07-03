@@ -46,7 +46,7 @@ def install_dependencies():
         try:
             subprocess.run([
                 sys.executable, '-m', 'pip', 'install', '-r', str(requirements_file)
-            ], check=True)
+            ], check=True, encoding='utf-8', errors='replace')
             print("✓ 依赖包安装完成")
         except subprocess.CalledProcessError:
             print("❌ 依赖包安装失败")
@@ -60,7 +60,7 @@ def setup_project():
     if setup_script.exists():
         print("初始化项目...")
         try:
-            subprocess.run([sys.executable, str(setup_script)], check=True)
+            subprocess.run([sys.executable, str(setup_script)], check=True, encoding='utf-8', errors='replace')
             print("✓ 项目初始化完成")
         except subprocess.CalledProcessError:
             print("❌ 项目初始化失败")
@@ -78,7 +78,7 @@ def start_server(host='127.0.0.1', port='8000'):
     try:
         subprocess.run([
             sys.executable, 'manage.py', 'runserver', f'{host}:{port}'
-        ], check=True)
+        ], check=True, encoding='utf-8', errors='replace')
     except KeyboardInterrupt:
         print("\n服务器已停止")
     except subprocess.CalledProcessError as e:

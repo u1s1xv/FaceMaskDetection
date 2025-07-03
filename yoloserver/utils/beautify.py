@@ -13,7 +13,7 @@ from collections import OrderedDict
 # ======================= 全局配置（基础值，作为内部默认和参考） ==========================
 # 注意：这些是“基准”值，如果用户没有通过CLI/YAML提供，将使用这些默认值
 BASE_FONT_PATH = "MapleMono550.wght.-VF.ttf"
-BASE_FONT_SIZE = 28  # 默认字体大小（针对 REF_DIM 720p 的基准）
+BASE_FONT_SIZE = 32  # 默认字体大小（针对 REF_DIM 720p 的基准）
 BASE_LINE_WIDTH = 4  # 默认线宽
 BASE_LABEL_PADDING = (10, 10)  # 默认标签内边距（水平，垂直）
 BASE_RADIUS = 4  # 默认圆角半径
@@ -25,9 +25,9 @@ LABEL_MAPPING = {
     "mask_weared_incorrect": "错误戴口罩"
 }
 COLOR_MAPPING = {
-    "with_mask": (0, 255, 0),  # 绿色 (BGR)
-    "without_mask": (255, 0, 0),  # 红色 (BGR)
-    "mask_weared_incorrect": (255, 193, 7)  # 黄色 (BGR)
+    "with_mask": (0, 255, 0),  # 绿色 (BGR) - 正确戴口罩
+    "without_mask": (0, 0, 255),  # 红色 (BGR) - 未戴口罩
+    "mask_weared_incorrect": (0, 255, 255)  # 黄色 (BGR) - 错误戴口罩
 }
 
 
