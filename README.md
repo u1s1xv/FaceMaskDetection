@@ -1,6 +1,6 @@
 # FaceMaskDetection - 智能口罩检测系统
 
-基于YOLO11深度学习的智能口罩佩戴检测平台，集成Django Web前端、YOLO推理服务、大模型AI分析和数据爬虫等完整功能模块。
+基于YOLO12深度学习的智能口罩佩戴检测平台，集成Django Web前端、YOLO推理服务、大模型AI分析和数据爬虫等完整功能模块。
 
 ## 项目概述
 
@@ -20,7 +20,7 @@ FaceMaskDetection是一个完整的口罩检测解决方案，专注于检测图
 ## 功能特性
 
 ### AI检测功能
-- **YOLO11模型**: 最新的目标检测算法，支持GPU/CPU自动切换
+- **YOLO12模型**: 最新的目标检测算法，支持GPU/CPU自动切换
 - **实时处理**: 快速图像上传和检测，支持多种格式（JPG、PNG、BMP）
 - **结果美化**: 高质量的检测结果可视化，支持中文标签和圆角边框
 - **批量处理**: 支持单张和多张图片同时检测
@@ -273,7 +273,7 @@ FaceMaskDetection/
 
 ### 后端技术
 - **Django 4.2+**: Web框架，提供完整的MVC架构
-- **YOLO11**: 最新的深度学习目标检测模型
+- **YOLO12**: 最新的深度学习目标检测模型
 - **Ultralytics**: YOLO框架实现，支持训练和推理
 - **SQLite/PostgreSQL**: 数据库，支持升级到生产环境
 - **Pillow**: 图像处理库，支持多种格式
@@ -439,7 +439,7 @@ class DetectionRecord(models.Model):
 ```javascript
 const formData = new FormData();
 formData.append('image', imageFile);
-formData.append('model_name', 'yolo11n-seg.pt');
+formData.append('model_name', 'YOLO12n-seg.pt');
 formData.append('confidence', 0.25);
 formData.append('iou', 0.45);
 formData.append('imgsz', 640);
@@ -484,7 +484,7 @@ fetch('/api/llm-analysis/', {
 python scripts/yolo_train.py --data data.yaml --epochs 200 --batch 16
 
 # 使用预训练模型
-python scripts/yolo_train.py --weights yolo11n-seg.pt --data data.yaml --epochs 200
+python scripts/yolo_train.py --weights YOLO12n-seg.pt --data data.yaml --epochs 200
 
 # 使用YAML配置文件
 python scripts/yolo_train.py --use_yaml True
