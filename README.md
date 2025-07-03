@@ -64,7 +64,7 @@ FaceMaskDetection是一个完整的口罩检测解决方案，专注于检测图
 
 ### 环境要求
 - **Python**: 3.8+
-- **操作系统**: Windows/Linux/macOS
+- **操作系统**: Windows
 - **内存**: 建议8GB以上
 - **存储**: 至少2GB可用空间
 - **网络**: 用于大模型API调用和数据爬虫

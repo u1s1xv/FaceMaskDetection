@@ -208,7 +208,7 @@ django_frontend/
 ### 环境要求
 - **Python**: 3.8+
 - **Django**: 4.2+
-- **操作系统**: Windows/Linux/macOS
+- **操作系统**: Windows
 - **内存**: 建议4GB以上
 - **存储**: 至少1GB可用空间
 
@@ -227,8 +227,8 @@ requests>=2.25.1
 
 ### 一键启动（推荐）
 ```bash
-# 确保在FMD虚拟环境中
-conda activate FMD
+# 激活conda虚拟环境
+conda activate
 
 # 进入Django项目目录
 cd django_frontend
@@ -239,8 +239,8 @@ python start_server.py
 
 ### 手动安装步骤
 ```bash
-# 1. 激活虚拟环境
-conda activate FMD
+# 1. 激活conda虚拟环境
+conda activate
 
 # 2. 进入Django项目目录
 cd django_frontend

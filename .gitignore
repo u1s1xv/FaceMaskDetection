@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 .vscode/
 .idea/
+.VSCodeCounter/
+
 # Data directories - ignore large datasets but keep structure
 yoloserver/data/*
 !yoloserver/data/.keep
