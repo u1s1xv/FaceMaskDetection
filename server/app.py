@@ -244,6 +244,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._llm_analyze()
             if segs == ["cameras", "open"]:
                 return self._camera_open()
+            if len(segs) == 3 and segs[0] == "cameras" and segs[2] == "mirror":
+                pipeline = get_manager().get_pipeline(segs[1])
+                if pipeline is None:
+                    return self._send_json(
+                        {"success": False, "error": "视频源不存在: " + segs[1]}, 404)
+                params = {}
+                raw = self._read_body()
+                if raw:
+                    try:
+                        params = json.loads(raw.decode("utf-8"))
+                    except (ValueError, UnicodeDecodeError):
+                        pass
+                pipeline.set_mirror(bool(params.get("mirror", True)))
+                return self._send_json({"success": True,
+                                        "mirror": pipeline.stats()["mirror"]})
             if len(segs) == 3 and segs[0] == "cameras" and segs[2] == "close":
                 ok = get_manager().close(segs[1])
                 return self._send_json({"success": ok,
@@ -366,6 +381,7 @@ class Handler(BaseHTTPRequestHandler):
                 height=int(params.get("height") or 480),
                 backend=params.get("backend") or None,
                 name=params.get("name") or None,
+                mirror=params.get("mirror", True),
             )
         except RuntimeError as exc:
             return self._send_json({"success": False, "error": str(exc)}, 400)

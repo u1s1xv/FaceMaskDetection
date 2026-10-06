@@ -304,6 +304,14 @@ void BackendClient::closeCamera(const QString &camId)
     });
 }
 
+void BackendClient::setCameraMirror(const QString &camId, bool mirror)
+{
+    QJsonObject body;
+    body.insert(QStringLiteral("mirror"), mirror);
+    postJson(QStringLiteral("/cameras/%1/mirror").arg(camId), body,
+             QStringLiteral("cameraMirror"));
+}
+
 void BackendClient::startStream(const QString &camId)
 {
     stopStream();

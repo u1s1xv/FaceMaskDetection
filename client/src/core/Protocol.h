@@ -76,6 +76,7 @@ struct LiveStats {
     double  jpegKb        = 0.0;
     int     droppedFrames = 0;
     QString lastError;
+    bool    mirror        = true;    // 画面是否镜像（服务端做的显示变换）
 
     // 最近一帧的检测结果
     int     total = 0;

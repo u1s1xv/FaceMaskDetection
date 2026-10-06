@@ -835,6 +835,26 @@ Boxes are drawn server-side, so they always stay in sync with the picture — no
         <source>（当前画面没有检测到目标）</source>
         <translation>(no target detected in the current view)</translation>
     </message>
+    <message>
+        <source>镜像画面</source>
+        <translation>Mirror</translation>
+    </message>
+    <message>
+        <source>桌面应用的惯例是镜像（像照镜子），视频会议的本地预览也是如此。
+工业监控场景建议关掉 —— 画面左右与现场一致，指挥&quot;往左一点&quot;才不会说反。
+镜像由服务端绘制，不会影响检测结果。</source>
+        <translation>Desktop apps conventionally mirror the preview (like a mirror), as do video-call apps.
+For industrial monitoring it is better to turn this off so that left and right match the site — otherwise &quot;move a bit to the left&quot; is reversed.
+Mirroring is applied server-side and does not affect detection results.</translation>
+    </message>
+    <message>
+        <source>画面已镜像</source>
+        <translation>Picture mirrored</translation>
+    </message>
+    <message>
+        <source>画面已取消镜像</source>
+        <translation>Mirroring disabled</translation>
+    </message>
 </context>
 <context>
     <name>fmd::LlmAnalysisDialog</name>

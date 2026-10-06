@@ -167,6 +167,7 @@ LiveStats LiveStats::fromJson(const QJsonObject &obj)
     s.jpegKb        = obj.value(QStringLiteral("jpeg_kb")).toDouble();
     s.droppedFrames = obj.value(QStringLiteral("dropped_frames")).toInt();
     s.lastError     = obj.value(QStringLiteral("last_error")).toString();
+    s.mirror        = obj.value(QStringLiteral("mirror")).toBool(true);
 
     const QJsonObject latest = obj.value(QStringLiteral("latest")).toObject();
     s.total      = latest.value(QStringLiteral("total")).toInt();

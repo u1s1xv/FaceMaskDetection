@@ -47,6 +47,10 @@ public:
     void openCamera(const QString &source, const QString &name = QString());
     void closeCamera(const QString &camId);
 
+    // 运行时切换画面镜像。镜像由服务端做 —— 因为帧率/延迟那些 OSD 文字
+    // 是服务端画进画面里的，客户端整体翻转会把文字也镜像掉。
+    void setCameraMirror(const QString &camId, bool mirror);
+
     // MJPEG 长连接。同一时刻只维持一路 —— 界面上一次只看一个画面，
     // 多开只会浪费带宽和 CPU。
     void startStream(const QString &camId);

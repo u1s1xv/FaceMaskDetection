@@ -434,7 +434,8 @@ class CameraManager:
         self._devices_at = 0.0
         self._devices_ttl = 30.0
 
-    def open(self, source, width=640, height=480, backend=None, name=None):
+    def open(self, source, width=640, height=480, backend=None, name=None,
+             mirror=True):
         """打开一个视频源，返回 (cam_id, source)。失败时抛 RuntimeError。"""
         with self._lock:
             self._counter += 1
@@ -458,7 +459,7 @@ class CameraManager:
         # 延迟导入：live.py 需要 camera.FrameSlot，模块顶层互相 import 会成环。
         # 这里只在真正打开摄像头时才导入，循环在加载期不会发生。
         from live import LivePipeline
-        pipeline = LivePipeline(src)
+        pipeline = LivePipeline(src, mirror=mirror)
         pipeline.start()
 
         with self._lock:

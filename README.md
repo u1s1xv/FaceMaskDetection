@@ -17,18 +17,23 @@
 | **历史记录** | 每次检测自动入库，支持按文件名/时间/ID 搜索、只看违规、查看标注结果、删除 |
 | **模型管理** | 扫描权重目录，展示体积与修改时间，可设为默认模型 |
 | **AI 分析** | 调用大模型对检测结果做合规性分析，**SSE 流式**逐字返回 |
-| **视频源** | 接入 USB 摄像头 / RTSP / 视频文件，latest-frame-wins 采集、断流自动重连 |
+| **实时监控** | 接入 USB 摄像头 / RTSP / 视频文件，MJPEG 推流叠加检测框，实时显示帧率、码率、端到端延迟 |
+| **画面镜像** | 默认镜像（桌面惯例，像照镜子）；工业监控可一键关掉，让画面左右与现场一致。镜像由服务端在画 OSD 之前完成，不影响检测结果 |
 | **国际化** | 中英双语（Qt Linguist），191 条字符串，中文无需翻译文件 |
 
 ## 界面
 
-| 单图检测 | 批量检测 |
+| 单图检测 | 实时监控 |
 |---|---|
-| ![检测](docs/screenshots/01-detect.png) | ![批量](docs/screenshots/02-batch.png) |
+| ![检测](docs/screenshots/01-detect.png) | ![实时](docs/screenshots/06-live.png) |
 
-| 历史记录 | 模型管理 | 设置 |
-|---|---|---|
-| ![历史](docs/screenshots/03-history.png) | ![模型](docs/screenshots/04-models.png) | ![设置](docs/screenshots/05-settings.png) |
+| 批量检测 | 历史记录 |
+|---|---|
+| ![批量](docs/screenshots/02-batch.png) | ![历史](docs/screenshots/03-history.png) |
+
+| 模型管理 | 设置 |
+|---|---|
+| ![模型](docs/screenshots/04-models.png) | ![设置](docs/screenshots/05-settings.png) |
 
 ---
 

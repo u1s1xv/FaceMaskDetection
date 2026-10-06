@@ -6,6 +6,7 @@
 #include "widgets/StatCard.h"
 
 #include <QColor>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QFileInfo>
@@ -99,6 +100,16 @@ void LiveView::buildUi()
     m_closeButton = new QPushButton(tr("关闭"), this);
     toolbar->addWidget(m_closeButton);
 
+    toolbar->addSpacing(12);
+    m_mirrorCheck = new QCheckBox(tr("镜像画面"), this);
+    m_mirrorCheck->setChecked(true);          // 与服务端默认值一致
+    m_mirrorCheck->setToolTip(
+        tr("桌面应用的惯例是镜像（像照镜子），视频会议的本地预览也是如此。\n"
+           "工业监控场景建议关掉 —— 画面左右与现场一致，指挥\"往左一点\"才不会说反。\n"
+           "镜像由服务端绘制，不会影响检测结果。"));
+    m_mirrorCheck->setEnabled(false);         // 没有视频源时不可用
+    toolbar->addWidget(m_mirrorCheck);
+
     outer->addLayout(toolbar);
 
     m_statusLabel = new QLabel(tr("尚未接入视频源"), this);
@@ -177,6 +188,7 @@ void LiveView::buildUi()
     connect(m_openButton,    &QPushButton::clicked, this, &LiveView::openSelected);
     connect(m_closeButton,   &QPushButton::clicked, this, &LiveView::closeCurrent);
     connect(m_sourceEdit, &QLineEdit::returnPressed, this, &LiveView::openCustomSource);
+    connect(m_mirrorCheck, &QCheckBox::toggled, this, &LiveView::onMirrorToggled);
 }
 
 // ------------------------------------------------------------ 操作
@@ -331,6 +343,14 @@ void LiveView::onRequestFailed(const QString &operation, const QString &error)
     updateButtons();
 }
 
+void LiveView::onMirrorToggled(bool checked)
+{
+    if (m_currentCamId.isEmpty())
+        return;
+    m_client->setCameraMirror(m_currentCamId, checked);
+    setStatus(checked ? tr("画面已镜像") : tr("画面已取消镜像"));
+}
+
 void LiveView::onTick()
 {
     if (m_client->isStreaming()) {
@@ -352,6 +372,13 @@ void LiveView::onTick()
 
 void LiveView::applyLiveStats(const CameraInfo &info)
 {
+    // 用服务端的真实状态回填复选框。断开信号避免"回填 -> 触发 toggled -> 又发请求"
+    // 这种自激循环。
+    if (m_mirrorCheck->isChecked() != info.live.mirror) {
+        const QSignalBlocker blocker(m_mirrorCheck);
+        m_mirrorCheck->setChecked(info.live.mirror);
+    }
+
     m_inferMs->setText(tr("%1 ms").arg(info.live.inferMs, 0, 'f', 1));
     m_e2eMs->setText(tr("%1 ms").arg(info.live.e2eMs, 0, 'f', 1));
     m_jpegKb->setText(tr("%1 KB").arg(info.live.jpegKb, 0, 'f', 1));
@@ -395,6 +422,7 @@ void LiveView::updateButtons()
     const bool streaming = m_client->isStreaming();
     m_openButton->setEnabled(!streaming);
     m_closeButton->setEnabled(streaming || !m_currentCamId.isEmpty());
+    m_mirrorCheck->setEnabled(streaming);
     m_sourceEdit->setEnabled(!streaming);
     m_deviceCombo->setEnabled(!streaming);
 }

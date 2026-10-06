@@ -817,6 +817,24 @@
         <source>（当前画面没有检测到目标）</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>镜像画面</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>桌面应用的惯例是镜像（像照镜子），视频会议的本地预览也是如此。
+工业监控场景建议关掉 —— 画面左右与现场一致，指挥&quot;往左一点&quot;才不会说反。
+镜像由服务端绘制，不会影响检测结果。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>画面已镜像</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>画面已取消镜像</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>fmd::LlmAnalysisDialog</name>

@@ -52,6 +52,7 @@ private slots:
     void onStreamFrame(const QImage &frame);
     void onStreamStopped(const QString &camId, const QString &reason);
     void onRequestFailed(const QString &operation, const QString &error);
+    void onMirrorToggled(bool checked);
     void onTick();
 
 private:
@@ -66,6 +67,7 @@ private:
     QComboBox   *m_deviceCombo = nullptr;
     QPushButton *m_refreshButton = nullptr;
     QLineEdit   *m_sourceEdit  = nullptr;
+    QCheckBox   *m_mirrorCheck = nullptr;
     QPushButton *m_openButton  = nullptr;
     QPushButton *m_closeButton = nullptr;
     QLabel      *m_statusLabel = nullptr;

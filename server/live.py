@@ -45,6 +45,26 @@ FALLBACK_COLOR = (200, 200, 200)
 JPEG_QUALITY = 80
 
 
+def mirror_detections(detections, width):
+    """把检测框沿垂直中轴翻转，配合 cv2.flip(frame, 1) 使用。
+
+    为什么不在客户端翻转画面：服务端把帧率/延迟这些 OSD 文字画在了画面里，
+    客户端整体翻转会把文字也镜像掉，没法读。所以必须在服务端翻，
+    且要在画 OSD 之前。
+
+    为什么翻转的是框而不是"先把画面翻过来再推理"：
+    这样推理永远跑在原始像素上，检测结果与镜像开关无关 ——
+    关掉镜像不会得到另一组结果，开关只是个显示变换。
+    """
+    out = []
+    for det in detections:
+        item = dict(det)                      # 不改原对象，它还要进 _results
+        item["x1"] = width - det["x2"]
+        item["x2"] = width - det["x1"]
+        out.append(item)
+    return out
+
+
 def draw_detections(frame, detections):
     """在帧上画检测框，返回**原地修改后**的帧。
 
@@ -99,8 +119,13 @@ class LivePipeline:
     """
 
     def __init__(self, source, model_name=None, confidence=0.25, iou=0.45,
-                 imgsz=640, target_fps=30.0, draw=True):
+                 imgsz=640, target_fps=30.0, draw=True, mirror=True):
         self._source = source
+        # 默认镜像。这是桌面应用的惯例（看着自己时像照镜子），
+        # 视频会议软件的本地预览也是这么做的。
+        # 工业监控场景通常要关掉 —— 画面左右与现场一致，
+        # 指挥"往左一点"才不会说反。界面上可随时切换。
+        self._mirror = bool(mirror)
         self._model_name = model_name
         self._confidence = confidence
         self._iou = iou
@@ -162,9 +187,16 @@ class LivePipeline:
                 infer_ms = (time.time() - t0) * 1000
 
                 detections = result.get("detections", [])
+
+                # 镜像只影响显示：先翻画面，再把框的 x 坐标翻过来，
+                # 最后才画框和 OSD（OSD 因此始终是正的）。
                 out = frame
+                if self._mirror:
+                    out = cv2.flip(frame, 1)
+                    detections = mirror_detections(detections, frame.shape[1])
+
                 if self._draw:
-                    out = draw_detections(frame, detections)
+                    out = draw_detections(out, detections)
 
                 ok, buf = cv2.imencode(".jpg", out,
                                        [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
@@ -202,6 +234,12 @@ class LivePipeline:
                 time.sleep(0.1)                        # 别在异常里空转
 
     # ------------------------------------------------------------ 读取
+    def set_mirror(self, value):
+        """运行时切换镜像。只影响显示，不影响推理。"""
+        with self._stats_lock:
+            self._mirror = bool(value)
+        logger.info("视频源镜像已%s", "开启" if value else "关闭")
+
     def peek_frame(self):
         """取最新标注帧（不消费）。"""
         return self._frames.peek()
@@ -226,5 +264,6 @@ class LivePipeline:
                 "dropped_frames": self._frames.dropped,
                 "jpeg_kb": round(len(payload["jpeg"]) / 1024, 1) if payload else 0,
                 "last_error": self._last_error,
+                "mirror": self._mirror,
                 "latest": self._latest_result,
             }
