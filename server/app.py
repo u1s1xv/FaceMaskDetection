@@ -24,6 +24,7 @@ import numpy as np
 
 from detector import get_detector, MODELS_DIR
 from llm import stream_analysis, api_key_configured, AVAILABLE_MODELS, DEFAULT_MODEL
+from camera import get_manager
 from storage import (get_store, DB_PATH, UPLOAD_DIR, DATA_DIR,
                      UPLOAD_RETENTION_DAYS, UPLOAD_MAX_MB)
 
@@ -98,6 +99,18 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 data["success"] = True
                 return self._send_json(data)
+            if segs == ["cameras"]:
+                return self._send_json({
+                    "success": True,
+                    "devices": get_manager().list_devices_cached(),
+                    "opened": get_manager().list_opened(),
+                })
+            if len(segs) == 3 and segs[0] == "cameras" and segs[2] == "stats":
+                src = get_manager().get(segs[1])
+                if src is None:
+                    return self._send_json(
+                        {"success": False, "error": "视频源不存在: " + segs[1]}, 404)
+                return self._send_json({"success": True, "stats": src.stats()})
             if len(segs) == 2 and segs[0] == "image":
                 return self._serve_image(segs[1])
             if len(segs) == 2 and segs[0] == "history":
@@ -167,11 +180,51 @@ class Handler(BaseHTTPRequestHandler):
                 return self._detect(query)
             if segs == ["llm", "analyze"]:
                 return self._llm_analyze()
+            if segs == ["cameras", "open"]:
+                return self._camera_open()
+            if len(segs) == 3 and segs[0] == "cameras" and segs[2] == "close":
+                ok = get_manager().close(segs[1])
+                return self._send_json({"success": ok,
+                                        "error": None if ok else "视频源不存在: " + segs[1]},
+                                       200 if ok else 404)
             return self._send_json(
                 {"success": False, "error": "未知路径: " + parsed.path}, 404)
         except Exception as exc:  # noqa: BLE001
             logger.exception("POST %s 失败", parsed.path)
             return self._send_json({"success": False, "error": str(exc)}, 500)
+
+    def _camera_open(self):
+        """打开一个视频源。
+
+        优先读 JSON 请求体（source 可能是带特殊字符的路径或 URL，
+        塞进 query string 还要转义），也兼容 query 参数。
+        """
+        params = {}
+        raw = self._read_body()
+        if raw:
+            try:
+                params = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError) as exc:
+                return self._send_json(
+                    {"success": False, "error": "请求体不是合法 JSON: %s" % exc}, 400)
+
+        source = params.get("source")
+        if source is None or str(source).strip() == "":
+            return self._send_json(
+                {"success": False, "error": "缺少 source（摄像头序号 / 视频路径 / RTSP 地址）"}, 400)
+
+        try:
+            cam_id, src = get_manager().open(
+                source,
+                width=int(params.get("width") or 640),
+                height=int(params.get("height") or 480),
+                backend=params.get("backend") or None,
+                name=params.get("name") or None,
+            )
+        except RuntimeError as exc:
+            return self._send_json({"success": False, "error": str(exc)}, 400)
+
+        return self._send_json({"success": True, "cam_id": cam_id, "stats": src.stats()})
 
     def _detect(self, query):
         raw = self._read_body()
