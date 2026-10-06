@@ -1,51 +1,47 @@
-# Python bytecode & cache
+# ============================================================================
+# FaceMaskDetection .gitignore
+# ============================================================================
+
+# ---- Python ----
 __pycache__/
 *.py[cod]
 *$py.class
+
+# ---- 编辑器 / IDE ----
 .vscode/
 .idea/
 .VSCodeCounter/
+*.user
+*.user.*
 
-# Data directories - ignore large datasets but keep structure
+# ---- 运行期数据 ----
+# 推理服务的历史库（SQLite）与上传原图，属于运行产物不入库
+/data/
+
+# ---- 数据集与日志：只保留目录骨架（.keep），内容不入库 ----
 yoloserver/data/*
 !yoloserver/data/.keep
 !yoloserver/data/*/.keep
 !yoloserver/data/*/*/.keep
 !yoloserver/data/crawled
 
-# Logs directories
 yoloserver/logs/*
 !yoloserver/logs/.keep
 !yoloserver/logs/*/.keep
 
-# Configs directories
 yoloserver/configs/*
 !yoloserver/configs/.keep
 
-# Runs directories
 yoloserver/runs/*
 !yoloserver/runs/.keep
 
-# Django Media directories
-django_frontend/media/*
-!django_frontend/media/.keep
-
-# Django sqlite database
-django_frontend/db.sqlite3
-
-# Qt/C++ client build artifacts
+# ---- C++/Qt 客户端构建产物 ----
 client/build/
 client/build-*/
 client/dist/
 client/tests/build/
-*.user
-*.user.*
 
-# 运行期数据（SQLite 历史库 + 上传原图），不入库
-/data/
-
-# 自检/冒烟测试产物
+# ---- 自检 / 冒烟 / 基准测试产物 ----
 client/*.out
 client/*.err
 client/*.log
-client/probe.py
