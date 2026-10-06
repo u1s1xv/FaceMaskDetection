@@ -255,7 +255,6 @@ docs/
 ├── TODO.md                     已知问题与后续方向  ← 想接着做就看这个
 ├── REFACTOR_PLAN.md            从 Django Web 版改造为桌面端的完整记录
 ├── screenshots/                界面截图（README 中引用）
-└── legacy/                     原协作项目的分工文档（来源凭据，不是产品内容）
 ```
 
 ### data/ —— 运行期数据（不入库）
