@@ -32,3 +32,20 @@ django_frontend/media/*
 
 # Django sqlite database
 django_frontend/db.sqlite3
+
+# Qt/C++ client build artifacts
+client/build/
+client/build-*/
+client/dist/
+client/tests/build/
+*.user
+*.user.*
+
+# 运行期数据（SQLite 历史库 + 上传原图），不入库
+/data/
+
+# 自检/冒烟测试产物
+client/*.out
+client/*.err
+client/*.log
+client/probe.py

@@ -1,0 +1,153 @@
+/* FaceMaskDetection 客户端主题
+ * 通过 Qt 资源系统编译进可执行文件（resources.qrc），无需随附外部文件。
+ * 选择器刻意写得具体（如 QPushButton#primaryButton），避免污染第三方控件。
+ */
+
+QWidget {
+    font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    font-size: 13px;
+    color: #24292f;
+}
+
+QMainWindow, QDialog {
+    background: #f6f8fa;
+}
+
+/* ---------------- 左侧导航 ---------------- */
+QListWidget#navList {
+    background: #1f2430;
+    border: none;
+    outline: none;
+    padding-top: 8px;
+    color: #c9d1d9;
+    font-size: 14px;
+}
+QListWidget#navList::item {
+    height: 42px;
+    padding-left: 18px;
+    border-left: 3px solid transparent;
+}
+QListWidget#navList::item:hover {
+    background: #2b3242;
+}
+QListWidget#navList::item:selected {
+    background: #2b3242;
+    border-left: 3px solid #2f81f7;
+    color: #ffffff;
+}
+
+/* ---------------- 分组框 ---------------- */
+QGroupBox {
+    background: #ffffff;
+    border: 1px solid #d8dee4;
+    border-radius: 6px;
+    margin-top: 14px;
+    padding: 10px;
+    font-weight: bold;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 10px;
+    padding: 0 4px;
+    color: #57606a;
+}
+
+/* ---------------- 按钮 ---------------- */
+QPushButton {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 6px 14px;
+    min-height: 20px;
+}
+QPushButton:hover  { background: #f3f4f6; }
+QPushButton:pressed { background: #ebecf0; }
+QPushButton:disabled {
+    color: #8c959f;
+    background: #f6f8fa;
+    border-color: #d8dee4;
+}
+
+/* 主操作按钮：靠 objectName 精确指定，不影响其它按钮 */
+QPushButton#primaryButton {
+    background: #1f6feb;
+    border: 1px solid #1a5fd0;
+    color: #ffffff;
+    font-weight: bold;
+}
+QPushButton#primaryButton:hover   { background: #2f81f7; }
+QPushButton#primaryButton:pressed { background: #1a5fd0; }
+QPushButton#primaryButton:disabled {
+    background: #a9c4f0;
+    border-color: #a9c4f0;
+    color: #f0f4fa;
+}
+
+/* ---------------- 输入控件 ---------------- */
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 4px 8px;
+    selection-background-color: #b6d5ff;
+    selection-color: #24292f;
+}
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border: 1px solid #1f6feb;
+}
+QComboBox::drop-down { border: none; width: 18px; }
+
+/* ---------------- 表格 / 列表 ---------------- */
+QTableView, QTableWidget, QListWidget {
+    background: #ffffff;
+    border: 1px solid #d8dee4;
+    border-radius: 6px;
+    gridline-color: #eaeef2;
+    selection-background-color: #ddf4ff;
+    selection-color: #24292f;
+    alternate-background-color: #fafbfc;
+}
+QHeaderView::section {
+    background: #f6f8fa;
+    border: none;
+    border-right: 1px solid #eaeef2;
+    border-bottom: 1px solid #d8dee4;
+    padding: 6px 8px;
+    font-weight: bold;
+    color: #57606a;
+}
+QTableView::item, QTableWidget::item { padding: 3px 6px; }
+
+/* ---------------- 进度条 ---------------- */
+QProgressBar {
+    background: #eaeef2;
+    border: none;
+    border-radius: 4px;
+    height: 14px;
+    text-align: center;
+    font-size: 11px;
+}
+QProgressBar::chunk {
+    background: #1f6feb;
+    border-radius: 4px;
+}
+
+/* ---------------- 状态栏 ---------------- */
+QStatusBar {
+    background: #ffffff;
+    border-top: 1px solid #d8dee4;
+    color: #57606a;
+}
+
+QSplitter::handle { background: #eaeef2; }
+QSplitter::handle:horizontal { width: 2px; }
+QSplitter::handle:vertical   { height: 2px; }
+
+QCheckBox { spacing: 6px; }
+QToolTip {
+    background: #24292f;
+    color: #ffffff;
+    border: none;
+    padding: 4px 6px;
+}
