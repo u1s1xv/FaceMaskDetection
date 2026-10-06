@@ -87,7 +87,7 @@ QVariant HistoryModel::data(const QModelIndex &index, int role) const
         return QVariant();
 
     case Qt::ToolTipRole:
-        return QStringLiteral("记录 #%1\n文件：%2\n模型：%3\n图像：%4×%5\n耗时：%6 ms\n排队：%7 ms")
+        return tr("记录 #%1\n文件：%2\n模型：%3\n图像：%4×%5\n耗时：%6 ms\n排队：%7 ms")
             .arg(r.id).arg(r.fileName).arg(r.modelName)
             .arg(r.imageWidth).arg(r.imageHeight)
             .arg(r.processingTime * 1000.0, 0, 'f', 0)
@@ -110,15 +110,15 @@ QVariant HistoryModel::headerData(int section, Qt::Orientation orientation, int 
 
     switch (section) {
     case ColId:      return QStringLiteral("ID");
-    case ColFile:    return QStringLiteral("文件名");
-    case ColSize:    return QStringLiteral("尺寸");
-    case ColTotal:   return QStringLiteral("目标数");
-    case ColWith:    return QStringLiteral("正确");
-    case ColWithout: return QStringLiteral("未佩戴");
-    case ColWrong:   return QStringLiteral("不规范");
-    case ColTime:    return QStringLiteral("推理 ms");
-    case ColQueue:   return QStringLiteral("排队 ms");
-    case ColCreated: return QStringLiteral("时间");
+    case ColFile:    return tr("文件名");
+    case ColSize:    return tr("尺寸");
+    case ColTotal:   return tr("目标数");
+    case ColWith:    return tr("正确");
+    case ColWithout: return tr("未佩戴");
+    case ColWrong:   return tr("不规范");
+    case ColTime:    return tr("推理 ms");
+    case ColQueue:   return tr("排队 ms");
+    case ColCreated: return tr("时间");
     default:         return QVariant();
     }
 }

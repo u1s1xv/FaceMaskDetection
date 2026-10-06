@@ -1,4 +1,5 @@
 #include "Protocol.h"
+#include <QCoreApplication>
 
 #include <QJsonArray>
 #include <QJsonValue>
@@ -12,7 +13,7 @@ DetectionResult DetectionResult::fromJson(const QJsonObject &obj)
 
     if (!r.success) {
         r.error = obj.value(QStringLiteral("error")).toString(
-                      QStringLiteral("服务端返回失败但未给出原因"));
+                      QCoreApplication::translate("Protocol", "服务端返回失败但未给出原因"));
         return r;
     }
 

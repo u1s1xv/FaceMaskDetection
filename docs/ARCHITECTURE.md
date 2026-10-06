@@ -94,7 +94,31 @@ Windows 上这是必踩的坑：
 - **Python 3 默认用系统本地编码写 stdout/stderr** → 启动子进程时注入 ``PYTHONUTF8=1`` 与 ``PYTHONIOENCODING=utf-8``
 - **MSVC 编译中文源码**需要 ``/utf-8`` 编译选项
 
-### 2.7 Model/View 的使用边界
+### 2.7 国际化：源码中文 + Qt Linguist 英文
+
+界面文本一律用 @@@@tr()@@@@ 包裹，由 lupdate 抽取到 @@@@.ts@@@@，翻译后经 lrelease 编译成 @@@@.qm@@@@：
+
+@@@@@@
+源码 tr("检测")  --lupdate-->  resources/i18n/fmd_en.ts  --人工翻译-->
+                --lrelease-->  build/i18n/fmd_en.qm  --QTranslator-->  运行时生效
+@@@@@@
+
+几个实际决定：
+
+- **源码语言就是中文**，所以 @@@@fmd_zh_CN.qm@@@@ 是空的，运行时靠 Qt 的"回退到源字符串"机制显示中文。
+  这意味着 **中文界面不依赖任何翻译文件**，翻译缺失永远不会让界面变空。
+- **只翻译用户可见文本**。JSON 字段名、@@@@setObjectName@@@@ 的值、QSettings 的键都是 ASCII，
+  刻意没有包 @@@@tr()@@@@ —— 把 @@@@objectName@@@@ 翻译掉会直接让 QSS 选择器失效。
+- **非 QObject 类**（如 @@@@Protocol@@@@、@@@DetectionItem@@@@ 这类没有 QObject 基类的类型）
+  不能用裸 @@@@tr()@@@@，改用 @@@@QCoreApplication::translate("上下文", "...")@@@@。
+- **切换语言需要重启应用**。手写 UI（非 .ui 文件）没有现成的 @@@@retranslateUi()@@@@，
+  要支持热切换得给每个页面实现重翻译逻辑，成本与收益不成正比。工业软件里重启生效也是常见做法，
+  所以「设置」页提供了「立即重启应用」按钮（@@@@QProcess::startDetached@@@@ + 关闭当前实例，
+  并确保先停掉后端进程）。
+
+覆盖情况：14 个 context、191 条字符串，英文翻译 191/191 完成。
+
+### 2.8 Model/View 的使用边界
 
 刻意**没有**到处都用自定义模型：
 

@@ -9,9 +9,13 @@
 #include <QDebug>
 
 #include <cstdio>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFile>
+#include <QLibraryInfo>
+#include <QLocale>
+#include <QTranslator>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -32,6 +36,62 @@
 #endif
 
 namespace {
+
+const QString kLanguageKey = QStringLiteral("ui/language");
+
+/**
+ * 解析当前界面语言，优先级：命令行 --lang > QSettings 用户选择 > 系统语言。
+ * 源码本身写的是中文，所以中文无需翻译文件（Qt 会用源字符串兜底）。
+ */
+QString resolveLanguage(const QStringList &args)
+{
+    const int idx = args.indexOf(QStringLiteral("--lang"));
+    if (idx >= 0 && idx + 1 < args.size())
+        return args.at(idx + 1);
+
+    const QString saved = QSettings().value(kLanguageKey).toString();
+    if (!saved.isEmpty())
+        return saved;
+
+    const QString system = QLocale::system().name();          // 形如 zh_CN / en_US
+    return system.startsWith(QLatin1String("zh")) ? QStringLiteral("zh_CN")
+                                                  : QStringLiteral("en_US");
+}
+
+// 可用的界面语言（与 resources/i18n/*.ts 一一对应）
+struct LanguageOption { const char *code; const char *label; };
+const LanguageOption kLanguages[] = {
+    { "zh_CN", "\u7b80\u4f53\u4e2d\u6587" },
+    { "en_US", "English" },
+};
+
+/**
+ * 安装翻译文件。.qm 由 lrelease 从 .ts 生成，构建后复制到可执行文件同级的 i18n/ 目录。
+ * 注意 QTranslator 必须比 QApplication 活得久，所以挂在 app 上。
+ */
+bool installTranslator(QApplication &app, const QString &language)
+{
+    const QString dir = QCoreApplication::applicationDirPath() + QStringLiteral("/i18n");
+
+    auto *translator = new QTranslator(&app);
+    if (!translator->load(QStringLiteral("fmd_") + language, dir)) {
+        delete translator;
+        return false;
+    }
+    app.installTranslator(translator);
+    return true;
+}
+
+// Qt 自带控件的内建翻译（对话框按钮等），属于 Qt 安装目录下的 qt_*.qm
+void installQtTranslator(QApplication &app, const QString &language)
+{
+    auto *translator = new QTranslator(&app);
+    const QString qtDir = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
+    if (translator->load(QStringLiteral("qt_") + language, qtDir))
+        app.installTranslator(translator);
+    else
+        delete translator;
+}
 
 // Qt5 默认的消息处理器在 Windows 上用 toLocal8Bit()（系统本地编码，中文机器上是 GBK），
 // 于是控制台、重定向文件、日志收集器三者拿到的编码互相不一致。
@@ -728,6 +788,48 @@ int runBenchmark(const QString &imagePath, int iterations)
     return 0;
 }
 
+// 国际化验证：加载指定语言，检查若干关键字符串确实被翻译。
+// 不依赖界面，可在无人环境跑，用于 CI 回归。
+// sourceLanguage=true 表示被测语言就是源码语言（中文），此时"未翻译"是正确行为，
+// 要验证的反而是能否优雅回退到源字符串。
+int runI18nCheck(bool sourceLanguage)
+{
+    struct Probe { const char *context; const char *source; };
+    const Probe probes[] = {
+        { "fmd::MainWindow",   "\u68c0\u6d4b" },              // 检测
+        { "fmd::MainWindow",   "\u5386\u53f2\u8bb0\u5f55" }, // 历史记录
+        { "fmd::DetectView",   "\u5f00\u59cb\u68c0\u6d4b" }, // 开始检测
+        { "fmd::SettingsView", "\u4fdd\u5b58" },              // 保存
+        { "fmd::HistoryView",  "\u5237\u65b0" },              // 刷新
+        { "fmd::BatchView",    "\u5f00\u59cb\u6279\u91cf\u68c0\u6d4b" }, // 开始批量检测
+    };
+
+    int  translated = 0;
+    const int total = int(sizeof(probes) / sizeof(probes[0]));
+
+    for (const Probe &probe : probes) {
+        const QString source = QString::fromUtf8(probe.source);
+        const QString result = QCoreApplication::translate(probe.context, probe.source);
+        const bool changed = (result != source);
+        if (changed)
+            ++translated;
+        qInfo().noquote() << QString("%1  [%2] %3  ->  %4")
+                                 .arg(changed ? "OK  " : "MISS")
+                                 .arg(QString::fromLatin1(probe.context))
+                                 .arg(source, result);
+    }
+
+    qInfo().noquote() << QString("\u7ffb\u8bd1\u547d\u4e2d %1 / %2").arg(translated).arg(total);
+
+    if (sourceLanguage) {
+        const bool ok = (translated == 0);   // 源语言不应有翻译，且必须能回退
+        qInfo().noquote() << (ok ? "\u6e90\u8bed\u8a00\uff1a\u5168\u90e8\u56de\u9000\u5230\u6e90\u5b57\u7b26\u4e32\uff08\u7b26\u5408\u9884\u671f\uff09"
+                                     : "\u6e90\u8bed\u8a00\u4e0d\u5e94\u51fa\u73b0\u7ffb\u8bd1");
+        return ok ? 0 : 1;
+    }
+    return translated == total ? 0 : 1;
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -749,6 +851,30 @@ int main(int argc, char *argv[])
     app.setApplicationVersion(QStringLiteral("0.1.0"));
 
     const QStringList args = app.arguments();
+
+    // 翻译要在任何界面构造之前装好
+    const QString language = resolveLanguage(args);
+    const bool loaded = installTranslator(app, language);
+    installQtTranslator(app, language);
+
+    if (args.contains(QStringLiteral("--check-i18n"))) {
+        qInfo().noquote() << "语言 =" << language
+                          << "| 翻译文件加载 =" << (loaded ? "成功" : "未找到（回退源字符串）");
+        // 中文是源码语言，不能要求它"被翻译"——那时要验的是回退行为
+        const bool isSourceLanguage = language.startsWith(QLatin1String("zh"));
+        const int rc = runI18nCheck(isSourceLanguage);
+        qInfo().noquote() << (rc == 0 ? "=== 国际化检查通过 ===" : "=== 国际化检查失败 ===");
+        return rc;
+    }
+
+    if (args.contains(QStringLiteral("--list-langs"))) {
+        for (const LanguageOption &option : kLanguages)
+            qInfo().noquote() << QString("%1  %2")
+                                     .arg(QString::fromLatin1(option.code), -8)
+                                     .arg(QString::fromUtf8(option.label));
+        return 0;
+    }
+
     const int idx = args.indexOf(QStringLiteral("--selftest"));
     if (idx >= 0) {
         QString image;

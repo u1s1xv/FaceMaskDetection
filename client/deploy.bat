@@ -25,6 +25,15 @@ mkdir dist
 copy /y build\fmd_client.exe dist\ >nul || exit /b 1
 windeployqt --release --no-translations --no-compiler-runtime --no-opengl-sw dist\fmd_client.exe || exit /b 1
 
+rem 翻译文件：运行时从可执行文件同级的 i18n\ 加载，必须一起拷过去
+if exist build\i18n (
+  xcopy /y /i /q build\i18n dist\i18n\ >nul || exit /b 1
+) else (
+  echo [WARN] 未找到 build\i18n，打包版将没有英文界面
+)
+rem 无头验证用的平台插件（正式交付可不带；带上不影响）
+if exist "%QT_DIR%\plugins\platforms\qoffscreen.dll" copy /y "%QT_DIR%\plugins\platforms\qoffscreen.dll" dist\platforms\ >nul
+
 echo [3/3] 校验依赖来源（必须全部来自 %QT_DIR%）...
 rem VersionInfo.FileName 返回的是 Qt 官方二进制的原始构建机路径，不能判断来源，必须比哈希
 powershell -NoProfile -Command "$bad=0; Get-ChildItem dist -Filter Qt5*.dll | ForEach-Object { $src=Join-Path '%QT_DIR%\bin' $_.Name; if (-not (Test-Path $src) -or (Get-FileHash $_.FullName).Hash -ne (Get-FileHash $src).Hash) { Write-Host ('[FAIL] ' + $_.Name); $bad++ } }; if ($bad -eq 0) { Write-Host '[OK] Qt DLL 全部来自 %QT_DIR%' } else { exit 1 }"

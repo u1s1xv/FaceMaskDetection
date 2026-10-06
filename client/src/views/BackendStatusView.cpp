@@ -31,18 +31,18 @@ void BackendStatusView::buildUi()
     auto *root = new QVBoxLayout(this);
 
     // ---- 服务状态 ----
-    auto *statusBox = new QGroupBox(QStringLiteral("推理服务状态"), this);
+    auto *statusBox = new QGroupBox(tr("推理服务状态"), this);
     auto *form = new QFormLayout(statusBox);
-    m_state       = addRow(form, QStringLiteral("连接状态"));
-    m_device      = addRow(form, QStringLiteral("计算设备"));
+    m_state       = addRow(form, tr("连接状态"));
+    m_device      = addRow(form, tr("计算设备"));
     m_gpu         = addRow(form, QStringLiteral("GPU"));
     m_torch       = addRow(form, QStringLiteral("PyTorch"));
     m_ultralytics = addRow(form, QStringLiteral("Ultralytics"));
-    m_modelDir    = addRow(form, QStringLiteral("模型目录"));
+    m_modelDir    = addRow(form, tr("模型目录"));
     root->addWidget(statusBox);
 
     // ---- 模型列表 ----
-    auto *modelsBox = new QGroupBox(QStringLiteral("可用模型"), this);
+    auto *modelsBox = new QGroupBox(tr("可用模型"), this);
     auto *modelsLayout = new QVBoxLayout(modelsBox);
     m_models = new QListWidget(modelsBox);
     m_models->setMaximumHeight(120);
@@ -51,8 +51,8 @@ void BackendStatusView::buildUi()
 
     // ---- 操作 ----
     auto *buttons = new QHBoxLayout;
-    auto *refresh = new QPushButton(QStringLiteral("刷新状态"), this);
-    auto *restart = new QPushButton(QStringLiteral("重启服务"), this);
+    auto *refresh = new QPushButton(tr("刷新状态"), this);
+    auto *restart = new QPushButton(tr("重启服务"), this);
     buttons->addWidget(refresh);
     buttons->addWidget(restart);
     buttons->addStretch();
@@ -62,7 +62,7 @@ void BackendStatusView::buildUi()
     connect(restart, &QPushButton::clicked, this, &BackendStatusView::restartRequested);
 
     // ---- 日志 ----
-    auto *logBox = new QGroupBox(QStringLiteral("服务端日志"), this);
+    auto *logBox = new QGroupBox(tr("服务端日志"), this);
     auto *logLayout = new QVBoxLayout(logBox);
     m_log = new QPlainTextEdit(logBox);
     m_log->setReadOnly(true);
@@ -74,16 +74,16 @@ void BackendStatusView::buildUi()
 
 void BackendStatusView::setConnecting()
 {
-    m_state->setText(QStringLiteral("正在连接…"));
+    m_state->setText(tr("正在连接…"));
 }
 
 void BackendStatusView::setHealth(const HealthInfo &info)
 {
     if (!info.ok) {
-        setConnectionError(info.error.isEmpty() ? QStringLiteral("服务未就绪") : info.error);
+        setConnectionError(info.error.isEmpty() ? tr("服务未就绪") : info.error);
         return;
     }
-    m_state->setText(QStringLiteral("已连接"));
+    m_state->setText(tr("已连接"));
     m_device->setText(info.device);
     m_gpu->setText(info.gpu.isEmpty() ? QStringLiteral("—") : info.gpu);
     m_torch->setText(info.torch);
@@ -101,12 +101,12 @@ void BackendStatusView::setModels(const QVector<ModelInfo> &models)
                               .arg(m.modified));
     }
     if (models.isEmpty())
-        m_models->addItem(QStringLiteral("（模型目录中没有 .pt 文件）"));
+        m_models->addItem(tr("（模型目录中没有 .pt 文件）"));
 }
 
 void BackendStatusView::setConnectionError(const QString &error)
 {
-    m_state->setText(QStringLiteral("连接失败：%1").arg(error));
+    m_state->setText(tr("连接失败：%1").arg(error));
 }
 
 void BackendStatusView::appendLog(const QString &line)

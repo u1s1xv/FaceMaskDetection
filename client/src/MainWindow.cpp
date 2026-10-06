@@ -11,6 +11,8 @@
 #include "views/SettingsView.h"
 
 #include <QCloseEvent>
+#include <QCoreApplication>
+#include <QProcess>
 #include <QLabel>
 #include <QListWidget>
 #include <QSplitter>
@@ -58,6 +60,25 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_modelsView, &ModelsView::defaultModelChanged, m_detectView, &DetectView::setCurrentModel);
 
     // 设置保存后：重新应用到进程与客户端；要求重启则重启服务
+    connect(m_settingsView, &SettingsView::restartAppRequested, this, [this]() {
+        // 先把后端进程干净地停掉，避免留下孤儿进程
+        m_healthTimer->stop();
+        if (m_proc)
+            m_proc->stop();
+
+        // 重新拉起一个自己，然后退出当前实例
+        const bool launched = QProcess::startDetached(
+            QCoreApplication::applicationFilePath(), QStringList());
+        if (!launched) {
+            statusBar()->showMessage(tr("重启失败，请手动重新打开程序"));
+            if (m_proc)
+                m_proc->start();
+            m_healthTimer->start(kHealthIntervalMs);
+            return;
+        }
+        close();
+    });
+
     connect(m_settingsView, &SettingsView::saved, this, [this](bool restartRequested) {
         applyStoredSettings();
         m_client->setBaseUrl(m_proc->baseUrl());
@@ -96,7 +117,7 @@ MainWindow::MainWindow(QWidget *parent)
             [this](const QString &op, const QString &err) {
                 if (op == QLatin1String("health"))
                     return;   // 启动期间连接失败属正常，继续轮询
-                m_statusView->appendLog(QStringLiteral("[错误] %1 请求失败: %2").arg(op, err));
+                m_statusView->appendLog(tr("[错误] %1 请求失败: %2").arg(op, err));
             });
 
     connect(m_statusView, &BackendStatusView::refreshRequested, this, [this]() {
@@ -104,7 +125,7 @@ MainWindow::MainWindow(QWidget *parent)
         m_client->fetchModels();
     });
     connect(m_statusView, &BackendStatusView::restartRequested, this, [this]() {
-        m_statusView->appendLog(QStringLiteral("[守护] 手动重启服务…"));
+        m_statusView->appendLog(tr("[守护] 手动重启服务…"));
         m_connected = false;
         m_proc->restart();
         m_healthAttempts = 0;
@@ -135,16 +156,16 @@ void MainWindow::applyStoredSettings()
 
 void MainWindow::buildUi()
 {
-    setWindowTitle(QStringLiteral("FaceMaskDetection — 智能口罩检测系统"));
+    setWindowTitle(tr("FaceMaskDetection — 智能口罩检测系统"));
     resize(1280, 820);
 
     m_nav = new QListWidget(this);
     m_nav->setObjectName(QStringLiteral("navList"));   // 供 QSS 精确选中
-    m_nav->addItem(QStringLiteral("检测"));
-    m_nav->addItem(QStringLiteral("批量检测"));
-    m_nav->addItem(QStringLiteral("历史记录"));
-    m_nav->addItem(QStringLiteral("模型管理"));
-    m_nav->addItem(QStringLiteral("设置"));
+    m_nav->addItem(tr("检测"));
+    m_nav->addItem(tr("批量检测"));
+    m_nav->addItem(tr("历史记录"));
+    m_nav->addItem(tr("模型管理"));
+    m_nav->addItem(tr("设置"));
     m_nav->setFixedWidth(160);
     m_nav->setCurrentRow(0);
 
@@ -176,9 +197,9 @@ void MainWindow::buildUi()
 
     setCentralWidget(splitter);
 
-    m_statusIndicator = new QLabel(QStringLiteral("后端：未连接"), this);
+    m_statusIndicator = new QLabel(tr("后端：未连接"), this);
     statusBar()->addPermanentWidget(m_statusIndicator);
-    statusBar()->showMessage(QStringLiteral("就绪"));
+    statusBar()->showMessage(tr("就绪"));
 }
 
 void MainWindow::setStatusText(const QString &text, bool ok)
@@ -190,22 +211,22 @@ void MainWindow::setStatusText(const QString &text, bool ok)
 
 void MainWindow::onBackendStarted()
 {
-    statusBar()->showMessage(QStringLiteral("推理服务已拉起（%1）").arg(m_proc->pythonExecutable()));
+    statusBar()->showMessage(tr("推理服务已拉起（%1）").arg(m_proc->pythonExecutable()));
 }
 
 void MainWindow::onBackendCrashed(int exitCode, const QString &reason)
 {
     m_connected = false;
-    setStatusText(QStringLiteral("后端：%1").arg(reason), false);
-    m_statusView->appendLog(QStringLiteral("[守护] %1 (exit=%2)").arg(reason).arg(exitCode));
+    setStatusText(tr("后端：%1").arg(reason), false);
+    m_statusView->appendLog(tr("[守护] %1 (exit=%2)").arg(reason).arg(exitCode));
     m_healthAttempts = 0;
     m_healthTimer->start(kHealthIntervalMs);
 }
 
 void MainWindow::onBackendError(const QString &error)
 {
-    setStatusText(QStringLiteral("后端：启动失败"), false);
-    m_statusView->appendLog(QStringLiteral("[错误] %1").arg(error));
+    setStatusText(tr("后端：启动失败"), false);
+    m_statusView->appendLog(tr("[错误] %1").arg(error));
     statusBar()->showMessage(error);
 }
 
@@ -214,8 +235,8 @@ void MainWindow::pollHealth()
     ++m_healthAttempts;
     if (!m_connected && m_healthAttempts > kHealthMaxTries) {
         m_healthTimer->stop();
-        setStatusText(QStringLiteral("后端：未就绪"), false);
-        m_statusView->setConnectionError(QStringLiteral("多次探测未响应，请查看日志"));
+        setStatusText(tr("后端：未就绪"), false);
+        m_statusView->setConnectionError(tr("多次探测未响应，请查看日志"));
         return;
     }
     m_client->checkHealth();
@@ -232,9 +253,9 @@ void MainWindow::onHealth(const HealthInfo &info)
 
     if (!m_connected) {
         m_connected = true;
-        setStatusText(QStringLiteral("后端：已连接 (%1)").arg(info.device));
+        setStatusText(tr("后端：已连接 (%1)").arg(info.device));
         statusBar()->showMessage(
-            QStringLiteral("推理服务就绪：%1 / PyTorch %2").arg(info.device, info.torch));
+            tr("推理服务就绪：%1 / PyTorch %2").arg(info.device, info.torch));
         m_client->fetchModels();
         m_healthTimer->start(kHealthIdleMs);   // 连上后降低探测频率
     }

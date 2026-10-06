@@ -1,4 +1,5 @@
 #include "DetectionItem.h"
+#include <QCoreApplication>
 
 #include <QBrush>
 #include <QFont>
@@ -50,7 +51,7 @@ DetectionItem::DetectionItem(const Detection &detection, QGraphicsItem *parent)
 
     setAcceptHoverEvents(true);
     setZValue(10);
-    setToolTip(QStringLiteral("%1\n置信度 %2\n坐标 (%3, %4) - (%5, %6)")
+    setToolTip(QCoreApplication::translate("DetectionItem", "%1\n置信度 %2\n坐标 (%3, %4) - (%5, %6)")
                    .arg(detection.className)
                    .arg(detection.confidence, 0, 'f', 4)
                    .arg(detection.x1, 0, 'f', 1).arg(detection.y1, 0, 'f', 1)

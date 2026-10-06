@@ -1,5 +1,19 @@
 # FaceMaskDetection 任务规划 —— Qt5 上位机客户端
 
+## 完成状态（A~G 已全部落地并验证）
+
+| 阶段 | 状态 | 验证方式 |
+| --- | --- | --- |
+| A 打通管道 | 完成 | selftest 退出码 0 |
+| B 单图检测 | 完成 | smoke-ui 退出码 0 |
+| C 批量检测 | 完成 | smoke-batch 6/6 成功 |
+| D 历史记录 | 完成 | smoke-history 退出码 0 |
+| E 模型与设置 | 完成 | smoke-settings 退出码 0 |
+| F LLM 流式 | 完成 | smoke-llm 收到 21 个内容块 |
+| G 打磨交付 | 完成 | QSS / Qt Test 11 例 / i18n 191 条 / windeployqt / 两份文档 |
+
+详见 docs/ARCHITECTURE.md 与 docs/BENCHMARK.md。
+
 ## 现状盘点
 
 | 资产 | 状态 |

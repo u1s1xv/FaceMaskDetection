@@ -43,18 +43,18 @@ void HistoryView::buildUi()
     // ---------------- 工具栏 ----------------
     auto *toolbar = new QHBoxLayout;
 
-    m_refreshButton = new QPushButton(QStringLiteral("刷新"), this);
+    m_refreshButton = new QPushButton(tr("刷新"), this);
     toolbar->addWidget(m_refreshButton);
 
     m_search = new QLineEdit(this);
-    m_search->setPlaceholderText(QStringLiteral("搜索文件名 / 时间 / ID…"));
+    m_search->setPlaceholderText(tr("搜索文件名 / 时间 / ID…"));
     m_search->setClearButtonEnabled(true);
     m_search->setMaximumWidth(320);
     toolbar->addWidget(m_search);
 
-    m_onlyViolations = new QCheckBox(QStringLiteral("只看违规"), this);
+    m_onlyViolations = new QCheckBox(tr("只看违规"), this);
     m_onlyViolations->setToolTip(
-        QStringLiteral("筛选出存在「未佩戴口罩」或「佩戴不规范」的记录"));
+        tr("筛选出存在「未佩戴口罩」或「佩戴不规范」的记录"));
     toolbar->addWidget(m_onlyViolations);
 
     toolbar->addStretch();
@@ -62,7 +62,7 @@ void HistoryView::buildUi()
     m_summary = new QLabel(QStringLiteral("—"), this);
     toolbar->addWidget(m_summary);
 
-    m_deleteButton = new QPushButton(QStringLiteral("删除选中"), this);
+    m_deleteButton = new QPushButton(tr("删除选中"), this);
     m_deleteButton->setEnabled(false);
     toolbar->addWidget(m_deleteButton);
 
@@ -90,7 +90,7 @@ void HistoryView::buildUi()
     auto *detailLayout = new QVBoxLayout(detailBox);
     detailLayout->setContentsMargins(0, 0, 0, 0);
 
-    m_detail = new QLabel(QStringLiteral("选中一行查看详情"), detailBox);
+    m_detail = new QLabel(tr("选中一行查看详情"), detailBox);
     m_detail->setWordWrap(true);
     m_detail->setTextInteractionFlags(Qt::TextSelectableByMouse);
     detailLayout->addWidget(m_detail);
@@ -131,7 +131,7 @@ int HistoryView::loadedRowCount() const
 
 void HistoryView::applyFilter()
 {
-    m_summary->setText(QStringLiteral("显示 %1 / 共 %2 条")
+    m_summary->setText(tr("显示 %1 / 共 %2 条")
                            .arg(m_proxy->rowCount()).arg(m_model->totalCount()));
 }
 
@@ -145,7 +145,7 @@ void HistoryView::onHistoryReceived(int total, const QVector<HistoryRecord> &ite
     m_model->setRecords(items);
     m_model->setTotal(total);
     applyFilter();
-    emit statusMessage(QStringLiteral("已加载 %1 条历史记录（共 %2 条）")
+    emit statusMessage(tr("已加载 %1 条历史记录（共 %2 条）")
                            .arg(items.size()).arg(total));
 }
 
@@ -164,7 +164,7 @@ void HistoryView::onSelectionChanged()
     const int id = currentRecordId();
     m_deleteButton->setEnabled(id > 0);
     if (id <= 0) {
-        m_detail->setText(QStringLiteral("选中一行查看详情"));
+        m_detail->setText(tr("选中一行查看详情"));
         m_canvas->clearAll();
         return;
     }
@@ -220,8 +220,8 @@ void HistoryView::deleteSelected()
         return;
 
     const auto answer = QMessageBox::question(
-        this, QStringLiteral("确认删除"),
-        QStringLiteral("确定要删除记录 #%1 吗？此操作不可撤销。").arg(id),
+        this, tr("确认删除"),
+        tr("确定要删除记录 #%1 吗？此操作不可撤销。").arg(id),
         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     if (answer != QMessageBox::Yes)
         return;
@@ -233,16 +233,16 @@ void HistoryView::onRecordDeleted(int id)
 {
     m_model->removeRecordById(id);
     m_canvas->clearAll();
-    m_detail->setText(QStringLiteral("记录 #%1 已删除").arg(id));
+    m_detail->setText(tr("记录 #%1 已删除").arg(id));
     applyFilter();
-    emit statusMessage(QStringLiteral("已删除记录 #%1").arg(id));
+    emit statusMessage(tr("已删除记录 #%1").arg(id));
 }
 
 void HistoryView::onRequestFailed(const QString &operation, const QString &error)
 {
     if (operation == QLatin1String("history") || operation == QLatin1String("record")
         || operation == QLatin1String("deleteRecord")) {
-        emit statusMessage(QStringLiteral("%1 失败：%2").arg(operation, error));
+        emit statusMessage(tr("%1 失败：%2").arg(operation, error));
     }
 }
 

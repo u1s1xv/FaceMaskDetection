@@ -50,19 +50,19 @@ void BatchView::buildUi()
     root->setContentsMargins(8, 8, 8, 8);
 
     // ---------------- 参数区 ----------------
-    auto *paramBox = new QGroupBox(QStringLiteral("批量参数"), this);
+    auto *paramBox = new QGroupBox(tr("批量参数"), this);
     auto *paramRow = new QHBoxLayout(paramBox);
 
     m_modelCombo = new QComboBox(paramBox);
     m_modelCombo->setMinimumWidth(230);
-    paramRow->addWidget(new QLabel(QStringLiteral("模型"), paramBox));
+    paramRow->addWidget(new QLabel(tr("模型"), paramBox));
     paramRow->addWidget(m_modelCombo);
 
     m_confSpin = new QDoubleSpinBox(paramBox);
     m_confSpin->setRange(0.01, 0.99);
     m_confSpin->setSingleStep(0.05);
     m_confSpin->setValue(0.25);
-    paramRow->addWidget(new QLabel(QStringLiteral("置信度"), paramBox));
+    paramRow->addWidget(new QLabel(tr("置信度"), paramBox));
     paramRow->addWidget(m_confSpin);
 
     m_iouSpin = new QDoubleSpinBox(paramBox);
@@ -77,7 +77,7 @@ void BatchView::buildUi()
     m_imgszCombo->addItem(QStringLiteral("640"), 640);
     m_imgszCombo->addItem(QStringLiteral("1280"), 1280);
     m_imgszCombo->setCurrentIndex(1);
-    paramRow->addWidget(new QLabel(QStringLiteral("尺寸"), paramBox));
+    paramRow->addWidget(new QLabel(tr("尺寸"), paramBox));
     paramRow->addWidget(m_imgszCombo);
 
     m_concurrencySpin = new QSpinBox(paramBox);
@@ -86,7 +86,7 @@ void BatchView::buildUi()
     m_concurrencySpin->setToolTip(QStringLiteral(
         "同时在途的请求数上限。服务端推理是串行的，调太大只会排队，\n"
         "建议 2~6；可用它做并发调优对比测试。"));
-    paramRow->addWidget(new QLabel(QStringLiteral("并发"), paramBox));
+    paramRow->addWidget(new QLabel(tr("并发"), paramBox));
     paramRow->addWidget(m_concurrencySpin);
 
     paramRow->addStretch();
@@ -94,11 +94,11 @@ void BatchView::buildUi()
 
     // ---------------- 操作区 ----------------
     auto *actionRow = new QHBoxLayout;
-    m_addFilesButton  = new QPushButton(QStringLiteral("添加图片…"), this);
-    m_addFolderButton = new QPushButton(QStringLiteral("添加文件夹…"), this);
-    m_startButton     = new QPushButton(QStringLiteral("开始批量检测"), this);
-    m_cancelButton    = new QPushButton(QStringLiteral("取消"), this);
-    m_clearButton     = new QPushButton(QStringLiteral("清空列表"), this);
+    m_addFilesButton  = new QPushButton(tr("添加图片…"), this);
+    m_addFolderButton = new QPushButton(tr("添加文件夹…"), this);
+    m_startButton     = new QPushButton(tr("开始批量检测"), this);
+    m_cancelButton    = new QPushButton(tr("取消"), this);
+    m_clearButton     = new QPushButton(tr("清空列表"), this);
     m_cancelButton->setEnabled(false);
     m_startButton->setEnabled(false);
 
@@ -116,17 +116,17 @@ void BatchView::buildUi()
     m_progress->setFormat(QStringLiteral("%v / %m"));
     root->addWidget(m_progress);
 
-    m_summary = new QLabel(QStringLiteral("尚未添加文件"), this);
+    m_summary = new QLabel(tr("尚未添加文件"), this);
     root->addWidget(m_summary);
 
     // ---------------- 结果表 ----------------
     // 这里用 QTableWidget 而不是自定义 Model：批量结果是一次性生成、
     // 条目量有限，也不需要反复筛选排序。历史记录页才是 Model/View 的用武之地。
     m_table = new QTableWidget(0, ColumnCount, this);
-    m_table->setHorizontalHeaderLabels({ QStringLiteral("文件"), QStringLiteral("状态"),
-                                         QStringLiteral("目标数"), QStringLiteral("正确"),
-                                         QStringLiteral("未佩戴"), QStringLiteral("不规范"),
-                                         QStringLiteral("耗时") });
+    m_table->setHorizontalHeaderLabels({ tr("文件"), tr("状态"),
+                                         tr("目标数"), tr("正确"),
+                                         tr("未佩戴"), tr("不规范"),
+                                         tr("耗时") });
     m_table->horizontalHeader()->setSectionResizeMode(ColFile, QHeaderView::Stretch);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -147,7 +147,7 @@ void BatchView::setModels(const QVector<ModelInfo> &models)
 {
     const QString previous = m_modelCombo->currentText();
     m_modelCombo->clear();
-    m_modelCombo->addItem(QStringLiteral("（自动选择 best）"), QString());
+    m_modelCombo->addItem(tr("（自动选择 best）"), QString());
     for (const ModelInfo &m : models)
         m_modelCombo->addItem(m.name, m.name);
     const int idx = m_modelCombo->findText(previous);
@@ -158,15 +158,15 @@ void BatchView::setModels(const QVector<ModelInfo> &models)
 void BatchView::addFiles()
 {
     const QStringList paths = QFileDialog::getOpenFileNames(
-        this, QStringLiteral("选择图片（可多选）"), QString(),
-        QStringLiteral("图片 (*.jpg *.jpeg *.png *.bmp *.webp)"));
+        this, tr("选择图片（可多选）"), QString(),
+        tr("图片 (*.jpg *.jpeg *.png *.bmp *.webp)"));
     appendRows(paths);
 }
 
 void BatchView::addFolder()
 {
     const QString dir = QFileDialog::getExistingDirectory(
-        this, QStringLiteral("选择包含图片的文件夹"));
+        this, tr("选择包含图片的文件夹"));
     if (dir.isEmpty())
         return;
 
@@ -198,14 +198,14 @@ void BatchView::appendRows(const QStringList &paths)
         m_table->setItem(row, ColFile, fileItem);
 
         for (int col = ColStatus; col < ColumnCount; ++col) {
-            auto *item = new QTableWidgetItem(col == ColStatus ? QStringLiteral("待处理")
+            auto *item = new QTableWidgetItem(col == ColStatus ? tr("待处理")
                                                                : QStringLiteral("—"));
             item->setTextAlignment(Qt::AlignCenter);
             m_table->setItem(row, col, item);
         }
     }
 
-    m_summary->setText(QStringLiteral("已添加 %1 个文件（双击某行可在单图页查看）").arg(all.size()));
+    m_summary->setText(tr("已添加 %1 个文件（双击某行可在单图页查看）").arg(all.size()));
     m_progress->setRange(0, all.size());
     m_progress->setValue(0);
     updateButtons();
@@ -233,7 +233,7 @@ void BatchView::setRowStatus(int row, const QString &text, const QColor &color)
 void BatchView::startBatch()
 {
     if (m_controller->totalCount() == 0) {
-        emit statusMessage(QStringLiteral("请先添加图片"));
+        emit statusMessage(tr("请先添加图片"));
         return;
     }
 
@@ -244,7 +244,7 @@ void BatchView::startBatch()
                                      m_imgszCombo->currentData().toInt());
 
     for (int row = 0; row < m_table->rowCount(); ++row) {
-        setRowStatus(row, QStringLiteral("排队中"), QColor(120, 120, 120));
+        setRowStatus(row, tr("排队中"), QColor(120, 120, 120));
         for (int col = ColTotal; col < ColumnCount; ++col)
             m_table->item(row, col)->setText(QStringLiteral("—"));
     }
@@ -272,7 +272,7 @@ void BatchView::clearList()
     m_table->setRowCount(0);
     m_progress->setRange(0, 100);
     m_progress->setValue(0);
-    m_summary->setText(QStringLiteral("尚未添加文件"));
+    m_summary->setText(tr("尚未添加文件"));
     updateButtons();
 }
 
@@ -292,7 +292,7 @@ void BatchView::onJobFinished(const QString &filePath, const DetectionResult &re
     if (row < 0)
         return;
 
-    setRowStatus(row, QStringLiteral("完成"), QColor(26, 127, 55));
+    setRowStatus(row, tr("完成"), QColor(26, 127, 55));
     m_table->item(row, ColTotal)->setText(QString::number(result.totalDetections));
     m_table->item(row, ColWith)->setText(
         QString::number(result.counts.value(QStringLiteral("with_mask"))));
@@ -309,9 +309,9 @@ void BatchView::onJobFailed(const QString &filePath, const QString &error)
     const int row = rowOf(filePath);
     if (row < 0)
         return;
-    setRowStatus(row, QStringLiteral("失败"), QColor(180, 35, 24));
+    setRowStatus(row, tr("失败"), QColor(180, 35, 24));
     if (QTableWidgetItem *item = m_table->item(row, ColFile))
-        item->setToolTip(QStringLiteral("%1\n错误：%2").arg(filePath, error));
+        item->setToolTip(tr("%1\n错误：%2").arg(filePath, error));
     emit jobFailedWithReason(filePath, error);
 }
 
@@ -319,15 +319,15 @@ void BatchView::onProgress(int finished, int succeeded, int failed, int total)
 {
     m_progress->setRange(0, qMax(1, total));
     m_progress->setValue(finished);
-    m_summary->setText(QStringLiteral("进度 %1/%2 — 成功 %3，失败 %4")
+    m_summary->setText(tr("进度 %1/%2 — 成功 %3，失败 %4")
                            .arg(finished).arg(total).arg(succeeded).arg(failed));
 }
 
 void BatchView::onBatchFinished(int succeeded, int failed, bool cancelled)
 {
     updateButtons();
-    m_summary->setText(QStringLiteral("%1 — 成功 %2，失败 %3")
-                           .arg(cancelled ? QStringLiteral("已取消") : QStringLiteral("批量完成"))
+    m_summary->setText(tr("%1 — 成功 %2，失败 %3")
+                           .arg(cancelled ? tr("已取消") : tr("批量完成"))
                            .arg(succeeded).arg(failed));
     emit statusMessage(m_summary->text());
     emit batchCompleted(succeeded, failed, cancelled);

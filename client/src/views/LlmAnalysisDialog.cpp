@@ -32,7 +32,7 @@ LlmAnalysisDialog::LlmAnalysisDialog(BackendClient *client, int recordId, QWidge
 
 void LlmAnalysisDialog::buildUi()
 {
-    setWindowTitle(QStringLiteral("AI 智能分析 — 记录 #%1").arg(m_recordId));
+    setWindowTitle(tr("AI 智能分析 — 记录 #%1").arg(m_recordId));
     resize(760, 620);
 
     auto *root = new QVBoxLayout(this);
@@ -40,25 +40,25 @@ void LlmAnalysisDialog::buildUi()
     auto *form = new QFormLayout;
     m_modelCombo = new QComboBox(this);
     m_modelCombo->setMinimumWidth(260);
-    form->addRow(QStringLiteral("分析模型"), m_modelCombo);
+    form->addRow(tr("分析模型"), m_modelCombo);
     root->addLayout(form);
 
-    root->addWidget(new QLabel(QStringLiteral("分析要求（可自定义提示词）"), this));
+    root->addWidget(new QLabel(tr("分析要求（可自定义提示词）"), this));
     m_promptEdit = new QPlainTextEdit(this);
-    m_promptEdit->setPlainText(QStringLiteral("请分析本次口罩检测结果，评估合规性并给出改进建议。"));
+    m_promptEdit->setPlainText(tr("请分析本次口罩检测结果，评估合规性并给出改进建议。"));
     m_promptEdit->setMaximumHeight(80);
     root->addWidget(m_promptEdit);
 
     auto *buttons = new QHBoxLayout;
-    m_startButton = new QPushButton(QStringLiteral("开始分析"), this);
-    m_saveButton  = new QPushButton(QStringLiteral("另存为文本…"), this);
+    m_startButton = new QPushButton(tr("开始分析"), this);
+    m_saveButton  = new QPushButton(tr("另存为文本…"), this);
     m_saveButton->setEnabled(false);
     buttons->addWidget(m_startButton);
     buttons->addWidget(m_saveButton);
     buttons->addStretch();
     root->addLayout(buttons);
 
-    m_hint = new QLabel(QStringLiteral("准备就绪"), this);
+    m_hint = new QLabel(tr("准备就绪"), this);
     m_hint->setStyleSheet(QStringLiteral("color: #666;"));
     root->addWidget(m_hint);
 
@@ -92,7 +92,7 @@ void LlmAnalysisDialog::onModelsReceived(const QStringList &models, const QStrin
             "未检测到 SILICONFLOW_API_KEY，将使用服务端模拟分析模式（链路完全相同，只是文本是本地生成的）"));
         m_hint->setStyleSheet(QStringLiteral("color: #b8860b;"));
     } else {
-        m_hint->setText(QStringLiteral("已配置 API Key，将调用真实大模型"));
+        m_hint->setText(tr("已配置 API Key，将调用真实大模型"));
     }
     m_startButton->setEnabled(!models.isEmpty());
 }
@@ -105,7 +105,7 @@ void LlmAnalysisDialog::startAnalysis()
     m_output->clear();
     m_received = false;
     setBusy(true);
-    m_hint->setText(QStringLiteral("正在流式接收…"));
+    m_hint->setText(tr("正在流式接收…"));
 
     m_client->analyzeStream(m_recordId,
                             m_promptEdit->toPlainText(),
@@ -115,8 +115,8 @@ void LlmAnalysisDialog::startAnalysis()
 void LlmAnalysisDialog::onAnalysisStarted(const QString &model, bool mockMode)
 {
     m_hint->setText(mockMode
-                        ? QStringLiteral("流式接收中（模拟模式）— 模型 %1").arg(model)
-                        : QStringLiteral("流式接收中 — 模型 %1").arg(model));
+                        ? tr("流式接收中（模拟模式）— 模型 %1").arg(model)
+                        : tr("流式接收中 — 模型 %1").arg(model));
 }
 
 void LlmAnalysisDialog::onAnalysisChunk(const QString &text)
@@ -132,34 +132,34 @@ void LlmAnalysisDialog::onAnalysisFinished()
 {
     setBusy(false);
     m_saveButton->setEnabled(m_received);
-    m_hint->setText(QStringLiteral("分析完成"));
+    m_hint->setText(tr("分析完成"));
 }
 
 void LlmAnalysisDialog::onAnalysisFailed(const QString &error)
 {
     setBusy(false);
-    m_hint->setText(QStringLiteral("分析失败：%1").arg(error));
+    m_hint->setText(tr("分析失败：%1").arg(error));
     m_hint->setStyleSheet(QStringLiteral("color: #b42318;"));
 }
 
 void LlmAnalysisDialog::saveAsText()
 {
     const QString path = QFileDialog::getSaveFileName(
-        this, QStringLiteral("保存分析结果"),
+        this, tr("保存分析结果"),
         QStringLiteral("analysis_record_%1.txt").arg(m_recordId),
-        QStringLiteral("文本文件 (*.txt)"));
+        tr("文本文件 (*.txt)"));
     if (path.isEmpty())
         return;
 
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        m_hint->setText(QStringLiteral("保存失败：%1").arg(file.errorString()));
+        m_hint->setText(tr("保存失败：%1").arg(file.errorString()));
         return;
     }
     QTextStream stream(&file);
     stream.setCodec("UTF-8");            // Qt5 是 setCodec（Qt6 改成 setEncoding）
     stream << m_output->toPlainText();
-    m_hint->setText(QStringLiteral("已保存到 %1").arg(path));
+    m_hint->setText(tr("已保存到 %1").arg(path));
 }
 
 } // namespace fmd

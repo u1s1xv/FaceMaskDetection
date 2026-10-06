@@ -111,7 +111,7 @@ void BackendProcess::start()
         return;
     }
     if (m_script.isEmpty() || !QFileInfo::exists(m_script)) {
-        emit errorOccurred(QStringLiteral("找不到服务端脚本 server/app.py，请检查路径或设置 FMD_SERVER_SCRIPT"));
+        emit errorOccurred(tr("找不到服务端脚本 server/app.py，请检查路径或设置 FMD_SERVER_SCRIPT"));
         return;
     }
 
@@ -126,11 +126,11 @@ void BackendProcess::start()
 
     const QStringList args = { m_script, QStringLiteral("--port"), QString::number(m_port) };
 
-    emit logMessage(QStringLiteral("[启动] %1 %2").arg(m_python, args.join(QLatin1Char(' '))));
+    emit logMessage(tr("[启动] %1 %2").arg(m_python, args.join(QLatin1Char(' '))));
     m_proc->start(m_python, args);
 
     if (!m_proc->waitForStarted(10000)) {
-        emit errorOccurred(QStringLiteral("服务进程启动失败: %1").arg(m_proc->errorString()));
+        emit errorOccurred(tr("服务进程启动失败: %1").arg(m_proc->errorString()));
         return;
     }
     emit started();
@@ -179,7 +179,7 @@ void BackendProcess::onReadyReadStandardError()
 void BackendProcess::onErrorOccurred(QProcess::ProcessError error)
 {
     if (error == QProcess::FailedToStart)
-        emit errorOccurred(QStringLiteral("无法启动服务进程: %1").arg(m_proc->errorString()));
+        emit errorOccurred(tr("无法启动服务进程: %1").arg(m_proc->errorString()));
 }
 
 void BackendProcess::onFinished(int exitCode, QProcess::ExitStatus status)
@@ -193,22 +193,22 @@ void BackendProcess::onFinished(int exitCode, QProcess::ExitStatus status)
     }
 
     const QString reason = (status == QProcess::CrashExit)
-        ? QStringLiteral("进程崩溃")
-        : QStringLiteral("进程退出，退出码 %1").arg(exitCode);
+        ? tr("进程崩溃")
+        : tr("进程退出，退出码 %1").arg(exitCode);
     emit crashed(exitCode, reason);
 
     // 自动重启：首次立即重试，之后退避，避免疯狂重启拖垮系统
     if (m_autoRestart && m_restartCount < 5) {
         const int delay = m_restartDelayMs * (m_restartCount + 1);
         ++m_restartCount;
-        emit logMessage(QStringLiteral("[守护] %1，%2 ms 后自动重启（第 %3 次）")
+        emit logMessage(tr("[守护] %1，%2 ms 后自动重启（第 %3 次）")
                             .arg(reason).arg(delay).arg(m_restartCount));
         QTimer::singleShot(delay, this, [this]() {
             if (!m_stopping)
                 start();
         });
     } else if (m_restartCount >= 5) {
-        emit logMessage(QStringLiteral("[守护] 连续重启超过 5 次，停止自动重启"));
+        emit logMessage(tr("[守护] 连续重启超过 5 次，停止自动重启"));
     }
 }
 

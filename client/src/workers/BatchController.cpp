@@ -90,7 +90,7 @@ void BatchController::start()
         j.bytes.clear();
     }
 
-    emit logMessage(QStringLiteral("批量开始：%1 个文件，最大并发 %2")
+    emit logMessage(tr("批量开始：%1 个文件，最大并发 %2")
                         .arg(m_jobs.size()).arg(m_maxConcurrent));
     emit progressChanged(0, 0, 0, m_jobs.size());
     pump();
@@ -101,7 +101,7 @@ void BatchController::cancel()
     if (!m_running)
         return;
     m_cancelled = true;
-    emit logMessage(QStringLiteral("已请求取消：不再派发新任务，在途的 %1 个会跑完")
+    emit logMessage(tr("已请求取消：不再派发新任务，在途的 %1 个会跑完")
                         .arg(m_inFlight.size()));
     if (m_inFlight.isEmpty())
         checkFinished();
@@ -178,9 +178,9 @@ void BatchController::checkFinished()
     }
 
     m_running = false;
-    emit logMessage(QStringLiteral("批量结束：成功 %1，失败 %2%3")
+    emit logMessage(tr("批量结束：成功 %1，失败 %2%3")
                         .arg(m_succeeded).arg(m_failed)
-                        .arg(m_cancelled ? QStringLiteral("（已取消）") : QString()));
+                        .arg(m_cancelled ? tr("（已取消）") : QString()));
     emit batchFinished(m_succeeded, m_failed, m_cancelled);
 }
 
@@ -223,7 +223,7 @@ void BatchController::onFileReadFailed(const QString &filePath, const QString &e
     const int idx = indexOf(filePath);
     if (idx < 0)
         return;
-    emit logMessage(QStringLiteral("读取失败 %1：%2")
+    emit logMessage(tr("读取失败 %1：%2")
                         .arg(QFileInfo(filePath).fileName(), error));
     emit jobFailed(filePath, error);
     completeJob(idx, false);
@@ -258,7 +258,7 @@ void BatchController::onRequestFailed(const QString &operation, const QString &e
     if (idx < 0)
         return;
 
-    emit logMessage(QStringLiteral("请求失败 %1：%2")
+    emit logMessage(tr("请求失败 %1：%2")
                         .arg(QFileInfo(tag).fileName(), error));
     emit jobFailed(tag, error);
     completeJob(idx, false);

@@ -58,64 +58,94 @@ void SettingsView::buildUi()
     root->setContentsMargins(8, 8, 8, 8);
 
     // ---------------- 连接配置 ----------------
-    auto *connBox = new QGroupBox(QStringLiteral("推理服务连接"), content);
+    auto *connBox = new QGroupBox(tr("推理服务连接"), content);
     auto *connForm = new QFormLayout(connBox);
 
     m_port = new QSpinBox(connBox);
     m_port->setRange(1024, 65535);
-    connForm->addRow(QStringLiteral("服务端口"), m_port);
+    connForm->addRow(tr("服务端口"), m_port);
 
     auto *pythonRow = new QHBoxLayout;
     m_python = new QLineEdit(connBox);
-    m_python->setPlaceholderText(QStringLiteral("留空则自动探测（环境变量 FMD_PYTHON > 配置 > conda med-yolo）"));
+    m_python->setPlaceholderText(tr("留空则自动探测（环境变量 FMD_PYTHON > 配置 > conda med-yolo）"));
     auto *pythonBrowse = new QPushButton(QStringLiteral("…"), connBox);
     pythonBrowse->setFixedWidth(32);
     pythonRow->addWidget(m_python, 1);
     pythonRow->addWidget(pythonBrowse);
-    connForm->addRow(QStringLiteral("Python 解释器"), pythonRow);
+    connForm->addRow(tr("Python 解释器"), pythonRow);
 
     auto *scriptRow = new QHBoxLayout;
     m_script = new QLineEdit(connBox);
-    m_script->setPlaceholderText(QStringLiteral("留空则按 <应用目录>/../../server/app.py 探测"));
+    m_script->setPlaceholderText(tr("留空则按 <应用目录>/../../server/app.py 探测"));
     auto *scriptBrowse = new QPushButton(QStringLiteral("…"), connBox);
     scriptBrowse->setFixedWidth(32);
     scriptRow->addWidget(m_script, 1);
     scriptRow->addWidget(scriptBrowse);
-    connForm->addRow(QStringLiteral("服务脚本"), scriptRow);
+    connForm->addRow(tr("服务脚本"), scriptRow);
 
     root->addWidget(connBox);
 
     // ---------------- 默认推理参数 ----------------
-    auto *inferBox = new QGroupBox(QStringLiteral("默认推理参数"), content);
+    auto *inferBox = new QGroupBox(tr("默认推理参数"), content);
     auto *inferForm = new QFormLayout(inferBox);
 
     m_modelCombo = new QComboBox(inferBox);
-    m_modelCombo->addItem(QStringLiteral("（自动选择 best）"), QString());
-    inferForm->addRow(QStringLiteral("默认模型"), m_modelCombo);
+    m_modelCombo->addItem(tr("（自动选择 best）"), QString());
+    inferForm->addRow(tr("默认模型"), m_modelCombo);
 
     m_confSpin = new QDoubleSpinBox(inferBox);
     m_confSpin->setRange(0.01, 0.99);
     m_confSpin->setSingleStep(0.05);
-    inferForm->addRow(QStringLiteral("置信度阈值"), m_confSpin);
+    inferForm->addRow(tr("置信度阈值"), m_confSpin);
 
     m_iouSpin = new QDoubleSpinBox(inferBox);
     m_iouSpin->setRange(0.01, 0.99);
     m_iouSpin->setSingleStep(0.05);
-    inferForm->addRow(QStringLiteral("IOU 阈值"), m_iouSpin);
+    inferForm->addRow(tr("IOU 阈值"), m_iouSpin);
 
     m_imgszCombo = new QComboBox(inferBox);
     m_imgszCombo->addItem(QStringLiteral("320"), 320);
     m_imgszCombo->addItem(QStringLiteral("640"), 640);
     m_imgszCombo->addItem(QStringLiteral("1280"), 1280);
-    inferForm->addRow(QStringLiteral("推理尺寸"), m_imgszCombo);
+    inferForm->addRow(tr("推理尺寸"), m_imgszCombo);
 
     root->addWidget(inferBox);
+
+    // ---------------- 界面语言 ----------------
+    auto *langBox = new QGroupBox(tr("界面语言"), content);
+    auto *langForm = new QFormLayout(langBox);
+
+    m_languageCombo = new QComboBox(langBox);
+    m_languageCombo->addItem(QStringLiteral("简体中文"), QStringLiteral("zh_CN"));
+    m_languageCombo->addItem(QStringLiteral("English"), QStringLiteral("en_US"));
+    langForm->addRow(tr("语言"), m_languageCombo);
+
+    auto *langHint = new QLabel(
+        tr("源码以中文编写，中文无需翻译文件；英文由 Qt Linguist 的 .ts/.qm 提供。\n"
+           "切换语言需要重建界面，保存后可点下方按钮立即重启应用。"), langBox);
+    langHint->setStyleSheet(QStringLiteral("color: #777;"));
+    langHint->setWordWrap(true);
+    langForm->addRow(langHint);
+
+    auto *restartAppButton = new QPushButton(tr("立即重启应用"), langBox);
+    langForm->addRow(QString(), restartAppButton);
+
+    connect(restartAppButton, &QPushButton::clicked, this, [this]() {
+        // 先把选择落盘，重启后才会生效
+        QSettings settings;
+        settings.setValue(QStringLiteral("ui/language"),
+                          m_languageCombo->currentData().toString());
+        settings.sync();
+        emit restartAppRequested();
+    });
+
+    root->addWidget(langBox);
 
     // ---------------- 操作 ----------------
     auto *buttons = new QHBoxLayout;
     buttons->addStretch();
-    auto *restartButton = new QPushButton(QStringLiteral("保存并重启服务"), content);
-    m_saveButton = new QPushButton(QStringLiteral("保存"), content);
+    auto *restartButton = new QPushButton(tr("保存并重启服务"), content);
+    m_saveButton = new QPushButton(tr("保存"), content);
     m_saveButton->setDefault(true);
     buttons->addWidget(restartButton);
     buttons->addWidget(m_saveButton);
@@ -152,13 +182,21 @@ void SettingsView::loadFromSettings()
     const int modelIdx = m_modelCombo->findData(model);
     if (modelIdx >= 0)
         m_modelCombo->setCurrentIndex(modelIdx);
+
+    // 语言：未显式设置过时，回显为"当前源码语言"（中文）
+    QString language = settings.value(QStringLiteral("ui/language")).toString();
+    if (language.isEmpty())
+        language = QStringLiteral("zh_CN");
+    const int langIdx = m_languageCombo->findData(language);
+    if (langIdx >= 0)
+        m_languageCombo->setCurrentIndex(langIdx);
 }
 
 void SettingsView::setModels(const QVector<ModelInfo> &models)
 {
     const QString current = m_modelCombo->currentData().toString();
     m_modelCombo->clear();
-    m_modelCombo->addItem(QStringLiteral("（自动选择 best）"), QString());
+    m_modelCombo->addItem(tr("（自动选择 best）"), QString());
     for (const ModelInfo &m : models)
         m_modelCombo->addItem(m.name, m.name);
 
@@ -177,9 +215,10 @@ void SettingsView::save()
     settings.setValue(QStringLiteral("infer/conf"),      m_confSpin->value());
     settings.setValue(QStringLiteral("infer/iou"),       m_iouSpin->value());
     settings.setValue(QStringLiteral("infer/imgsz"),     m_imgszCombo->currentData().toInt());
+    settings.setValue(QStringLiteral("ui/language"),     m_languageCombo->currentData().toString());
     settings.sync();
 
-    m_statusView->appendLog(QStringLiteral("[设置] 已保存（端口 %1）").arg(m_port->value()));
+    m_statusView->appendLog(tr("[设置] 已保存（端口 %1）").arg(m_port->value()));
     emit saved(false);
 }
 
@@ -192,8 +231,8 @@ void SettingsView::saveAndRestart()
 void SettingsView::browsePython()
 {
     const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("选择 Python 解释器"), QString(),
-        QStringLiteral("可执行文件 (*.exe);;所有文件 (*.*)"));
+        this, tr("选择 Python 解释器"), QString(),
+        tr("可执行文件 (*.exe);;所有文件 (*.*)"));
     if (!path.isEmpty())
         m_python->setText(path);
 }
@@ -201,8 +240,8 @@ void SettingsView::browsePython()
 void SettingsView::browseScript()
 {
     const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("选择服务端脚本"), QString(),
-        QStringLiteral("Python 脚本 (*.py);;所有文件 (*.*)"));
+        this, tr("选择服务端脚本"), QString(),
+        tr("Python 脚本 (*.py);;所有文件 (*.*)"));
     if (!path.isEmpty())
         m_script->setText(path);
 }

@@ -12,7 +12,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # ---- Qt5 (工业上位机主流版本) ----
-find_package(Qt5 5.15 REQUIRED COMPONENTS Widgets Network)
+find_package(Qt5 5.15 REQUIRED COMPONENTS Widgets Network LinguistTools)
 
 set(FMD_SOURCES
     resources/resources.qrc
@@ -55,7 +55,23 @@ set(FMD_SOURCES
     src/workers/ImageLoaderTask.cpp
 )
 
-add_executable(fmd_client ${FMD_SOURCES})
+# ---- 国际化 ----
+# qt5_create_translation 会先跑 lupdate 从源码抽取 tr() 字符串更新 .ts，
+# 再跑 lrelease 生成 .qm。.ts 是给人改的（进版本库），.qm 是运行时用的（构建产物）。
+set(FMD_TS_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/i18n/fmd_zh_CN.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/i18n/fmd_en.ts
+)
+qt5_create_translation(FMD_QM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src ${FMD_TS_FILES})
+
+add_executable(fmd_client ${FMD_SOURCES} ${FMD_QM_FILES})
+
+# .qm 是运行时从可执行文件同级的 i18n/ 目录加载的
+add_custom_command(TARGET fmd_client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:fmd_client>/i18n"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FMD_QM_FILES}
+            "$<TARGET_FILE_DIR:fmd_client>/i18n"
+)
 
 target_include_directories(fmd_client PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 

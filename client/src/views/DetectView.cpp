@@ -60,13 +60,13 @@ void DetectView::buildUi()
     root->setContentsMargins(8, 8, 8, 8);
 
     // ---------------- 左侧：画布 ----------------
-    auto *canvasBox = new QGroupBox(QStringLiteral("图像"), this);
+    auto *canvasBox = new QGroupBox(tr("图像"), this);
     auto *canvasLayout = new QVBoxLayout(canvasBox);
 
     m_canvas = new ImageCanvas(canvasBox);
     canvasLayout->addWidget(m_canvas, 1);
 
-    m_hint = new QLabel(QStringLiteral("把图片拖到这里，或点击「打开图片」"), canvasBox);
+    m_hint = new QLabel(tr("把图片拖到这里，或点击「打开图片」"), canvasBox);
     m_hint->setAlignment(Qt::AlignCenter);
     m_hint->setStyleSheet(QStringLiteral("color: #999; padding: 4px;"));
     canvasLayout->addWidget(m_hint);
@@ -80,33 +80,33 @@ void DetectView::buildUi()
     sideLayout->setContentsMargins(0, 0, 0, 0);
 
     // 参数
-    auto *paramBox = new QGroupBox(QStringLiteral("推理参数"), side);
+    auto *paramBox = new QGroupBox(tr("推理参数"), side);
     auto *paramForm = new QFormLayout(paramBox);
 
     m_modelCombo = new QComboBox(paramBox);
     m_modelCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-    paramForm->addRow(QStringLiteral("模型"), m_modelCombo);
+    paramForm->addRow(tr("模型"), m_modelCombo);
 
     m_confSpin = new QDoubleSpinBox(paramBox);
     m_confSpin->setRange(0.01, 0.99);
     m_confSpin->setSingleStep(0.05);
     m_confSpin->setValue(0.25);
-    paramForm->addRow(QStringLiteral("置信度阈值"), m_confSpin);
+    paramForm->addRow(tr("置信度阈值"), m_confSpin);
 
     m_iouSpin = new QDoubleSpinBox(paramBox);
     m_iouSpin->setRange(0.01, 0.99);
     m_iouSpin->setSingleStep(0.05);
     m_iouSpin->setValue(0.45);
-    paramForm->addRow(QStringLiteral("IOU 阈值"), m_iouSpin);
+    paramForm->addRow(tr("IOU 阈值"), m_iouSpin);
 
     m_imgszCombo = new QComboBox(paramBox);
     m_imgszCombo->addItem(QStringLiteral("320"), 320);
     m_imgszCombo->addItem(QStringLiteral("640"), 640);
     m_imgszCombo->addItem(QStringLiteral("1280"), 1280);
     m_imgszCombo->setCurrentIndex(1);
-    paramForm->addRow(QStringLiteral("推理尺寸"), m_imgszCombo);
+    paramForm->addRow(tr("推理尺寸"), m_imgszCombo);
 
-    m_serverRenderCheck = new QCheckBox(QStringLiteral("使用服务端渲染图"), paramBox);
+    m_serverRenderCheck = new QCheckBox(tr("使用服务端渲染图"), paramBox);
     m_serverRenderCheck->setToolTip(
         QStringLiteral("关闭（默认）：服务端只回结构化数据，客户端自绘检测框，载荷小、框可缩放悬停。\n"
                        "打开：服务端回已画好框的 PNG，用于对比测试。"));
@@ -116,8 +116,8 @@ void DetectView::buildUi()
 
     // 操作
     auto *actionRow = new QHBoxLayout;
-    m_openButton = new QPushButton(QStringLiteral("打开图片"), side);
-    m_detectButton = new QPushButton(QStringLiteral("开始检测"), side);
+    m_openButton = new QPushButton(tr("打开图片"), side);
+    m_detectButton = new QPushButton(tr("开始检测"), side);
     m_detectButton->setObjectName(QStringLiteral("primaryButton"));
     m_detectButton->setEnabled(false);
     actionRow->addWidget(m_openButton);
@@ -132,7 +132,7 @@ void DetectView::buildUi()
     sideLayout->addWidget(m_progress);
 
     // 结果
-    auto *resultBox = new QGroupBox(QStringLiteral("检测结果"), side);
+    auto *resultBox = new QGroupBox(tr("检测结果"), side);
     auto *resultLayout = new QVBoxLayout(resultBox);
 
     m_fileLabel = new QLabel(QStringLiteral("—"), resultBox);
@@ -157,16 +157,16 @@ void DetectView::buildUi()
     m_countWithout->setStyleSheet(QStringLiteral("color: #c62828;"));
     m_countWrong->setStyleSheet(QStringLiteral("color: #b8860b;"));
 
-    countForm->addRow(QStringLiteral("正确佩戴"), m_countWith);
-    countForm->addRow(QStringLiteral("未佩戴"),   m_countWithout);
-    countForm->addRow(QStringLiteral("佩戴不规范"), m_countWrong);
-    countForm->addRow(QStringLiteral("目标总数"),  m_totalLabel);
-    countForm->addRow(QStringLiteral("处理耗时"),  m_timeLabel);
+    countForm->addRow(tr("正确佩戴"), m_countWith);
+    countForm->addRow(tr("未佩戴"),   m_countWithout);
+    countForm->addRow(tr("佩戴不规范"), m_countWrong);
+    countForm->addRow(tr("目标总数"),  m_totalLabel);
+    countForm->addRow(tr("处理耗时"),  m_timeLabel);
     resultLayout->addLayout(countForm);
 
-    m_llmButton = new QPushButton(QStringLiteral("AI 智能分析…"), resultBox);
+    m_llmButton = new QPushButton(tr("AI 智能分析…"), resultBox);
     m_llmButton->setEnabled(false);
-    m_llmButton->setToolTip(QStringLiteral("对当前这条检测记录调用大模型做合规性分析"));
+    m_llmButton->setToolTip(tr("对当前这条检测记录调用大模型做合规性分析"));
     resultLayout->addWidget(m_llmButton);
 
     m_detectionList = new QListWidget(resultBox);
@@ -186,7 +186,7 @@ void DetectView::setModels(const QVector<ModelInfo> &models)
 {
     const QString previous = m_modelCombo->currentText();
     m_modelCombo->clear();
-    m_modelCombo->addItem(QStringLiteral("（自动选择 best）"), QString());
+    m_modelCombo->addItem(tr("（自动选择 best）"), QString());
     for (const ModelInfo &m : models)
         m_modelCombo->addItem(m.name, m.name);
 
@@ -226,8 +226,8 @@ void DetectView::dropEvent(QDropEvent *event)
 void DetectView::openImageDialog()
 {
     const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("选择图片"), QString(),
-        QStringLiteral("图片 (*.jpg *.jpeg *.png *.bmp *.webp);;所有文件 (*.*)"));
+        this, tr("选择图片"), QString(),
+        tr("图片 (*.jpg *.jpeg *.png *.bmp *.webp);;所有文件 (*.*)"));
     if (!path.isEmpty())
         loadImage(path);
 }
@@ -237,12 +237,12 @@ void DetectView::loadImage(const QString &filePath)
     if (filePath.isEmpty())
         return;
     if (m_busy) {
-        emit statusMessage(QStringLiteral("正在推理中，请稍候…"));
+        emit statusMessage(tr("正在推理中，请稍候…"));
         return;
     }
 
     resetResults();
-    m_hint->setText(QStringLiteral("正在加载 %1 …").arg(QFileInfo(filePath).fileName()));
+    m_hint->setText(tr("正在加载 %1 …").arg(QFileInfo(filePath).fileName()));
 
     auto *task = new ImageLoaderTask(filePath);
     connect(task, &ImageLoaderTask::loaded, this, &DetectView::onImageLoaded);
@@ -258,28 +258,28 @@ void DetectView::onImageLoaded(const QString &filePath, const QImage &image,
     m_currentBytes = rawBytes;
 
     m_canvas->setImage(image);
-    m_fileLabel->setText(QStringLiteral("%1\n%2 × %3 像素，%4 KB")
+    m_fileLabel->setText(tr("%1\n%2 × %3 像素，%4 KB")
                              .arg(QFileInfo(filePath).fileName())
                              .arg(image.width())
                              .arg(image.height())
                              .arg(rawBytes.size() / 1024.0, 0, 'f', 1));
-    m_hint->setText(QStringLiteral("解码耗时 %1 ms — 点击「开始检测」").arg(elapsedMs));
+    m_hint->setText(tr("解码耗时 %1 ms — 点击「开始检测」").arg(elapsedMs));
     m_detectButton->setEnabled(true);
 
-    emit statusMessage(QStringLiteral("已加载 %1").arg(QFileInfo(filePath).fileName()));
+    emit statusMessage(tr("已加载 %1").arg(QFileInfo(filePath).fileName()));
 }
 
 void DetectView::onImageLoadFailed(const QString &filePath, const QString &error)
 {
-    m_hint->setText(QStringLiteral("加载失败：%1").arg(error));
-    emit statusMessage(QStringLiteral("加载 %1 失败：%2")
+    m_hint->setText(tr("加载失败：%1").arg(error));
+    emit statusMessage(tr("加载 %1 失败：%2")
                            .arg(QFileInfo(filePath).fileName(), error));
 }
 
 void DetectView::startDetection()
 {
     if (m_currentBytes.isEmpty()) {
-        emit statusMessage(QStringLiteral("请先选择一张图片"));
+        emit statusMessage(tr("请先选择一张图片"));
         return;
     }
 
@@ -289,7 +289,7 @@ void DetectView::startDetection()
     m_canvas->setDetections({});
 
     setBusy(true);
-    emit statusMessage(QStringLiteral("正在推理…（首次调用要加载模型，可能数秒）"));
+    emit statusMessage(tr("正在推理…（首次调用要加载模型，可能数秒）"));
 
     m_client->detect(m_currentBytes,
                      m_modelCombo->currentData().toString(),
@@ -309,8 +309,8 @@ void DetectView::onDetectionFinished(const QString &tag, const DetectionResult &
     setBusy(false);
 
     if (!result.success) {
-        m_hint->setText(QStringLiteral("推理失败：%1").arg(result.error));
-        emit statusMessage(QStringLiteral("推理失败：%1").arg(result.error));
+        m_hint->setText(tr("推理失败：%1").arg(result.error));
+        emit statusMessage(tr("推理失败：%1").arg(result.error));
         return;
     }
 
@@ -321,18 +321,18 @@ void DetectView::onDetectionFinished(const QString &tag, const DetectionResult &
         const QImage annotated = QImage::fromData(result.annotatedPng, "PNG");
         if (!annotated.isNull()) {
             m_canvas->setImage(annotated);
-            m_hint->setText(QStringLiteral("服务端渲染图（%1 KB）")
+            m_hint->setText(tr("服务端渲染图（%1 KB）")
                                 .arg(result.annotatedPng.size() / 1024.0, 0, 'f', 1));
         }
     } else {
         // 客户端渲染模式：原图 + 矢量检测框
         m_canvas->setDetections(result.detections);
-        m_hint->setText(QStringLiteral("客户端自绘 %1 个检测框 — 滚轮缩放，悬停查看置信度")
+        m_hint->setText(tr("客户端自绘 %1 个检测框 — 滚轮缩放，悬停查看置信度")
                             .arg(result.detections.size()));
     }
 
     showResultSummary(result);
-    emit statusMessage(QStringLiteral("检测完成：%1 个目标，耗时 %2 s")
+    emit statusMessage(tr("检测完成：%1 个目标，耗时 %2 s")
                            .arg(result.totalDetections)
                            .arg(result.processingTime, 0, 'f', 3));
 }
@@ -340,7 +340,7 @@ void DetectView::onDetectionFinished(const QString &tag, const DetectionResult &
 void DetectView::openLlmAnalysis()
 {
     if (m_lastResult.recordId <= 0) {
-        emit statusMessage(QStringLiteral("这条结果没有落库记录，无法做历史关联分析"));
+        emit statusMessage(tr("这条结果没有落库记录，无法做历史关联分析"));
         return;
     }
     LlmAnalysisDialog dialog(m_client, m_lastResult.recordId, this);
@@ -358,13 +358,13 @@ void DetectView::showResultSummary(const DetectionResult &result)
 
     m_detectionList->clear();
     for (const Detection &d : result.detections) {
-        m_detectionList->addItem(QStringLiteral("#%1  %2  置信度 %3")
+        m_detectionList->addItem(tr("#%1  %2  置信度 %3")
                                      .arg(d.classId)
                                      .arg(d.className)
                                      .arg(d.confidence, 0, 'f', 3));
     }
     if (result.detections.isEmpty())
-        m_detectionList->addItem(QStringLiteral("（未检测到目标）"));
+        m_detectionList->addItem(tr("（未检测到目标）"));
 }
 
 void DetectView::resetResults()
@@ -396,8 +396,8 @@ void DetectView::onRequestFailed(const QString &operation, const QString &error)
     if (operation != QLatin1String("detect"))
         return;
     setBusy(false);
-    m_hint->setText(QStringLiteral("请求失败：%1").arg(error));
-    emit statusMessage(QStringLiteral("推理请求失败：%1").arg(error));
+    m_hint->setText(tr("请求失败：%1").arg(error));
+    emit statusMessage(tr("推理请求失败：%1").arg(error));
 }
 
 } // namespace fmd

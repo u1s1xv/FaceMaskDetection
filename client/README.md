@@ -69,8 +69,22 @@ run_tests.bat
 | `--smoke-settings <端口>` | 配置链路：QSettings → 进程 → 客户端 |
 | `--smoke-llm` | 流式分析：SSE 增量解析 |
 | `--benchmark <图片> <N>` | 性能基准，输出 Markdown 表格 |
+| `--check-i18n --lang <语言>` | 国际化：验证翻译文件加载与关键字符串命中 |
+| `--list-langs` | 列出可用界面语言 |
 
 全部通过时退出码为 0。
+
+## 国际化
+
+```bat
+build\fmd_client.exe --check-i18n --lang en_US
+build\fmd_client.exe --lang en_US        REM 以英文界面启动
+```
+
+- 源码语言是中文，所以中文界面**不依赖翻译文件**（Qt 回退到源字符串）
+- 英文翻译在 `resources/i18n/fmd_en.ts`，构建时由 lupdate/lrelease 自动处理
+- 修改带 `tr()` 的文本后重新构建即可，lupdate 会自动更新 .ts
+- 切换语言在「设置」页，保存后点「立即重启应用」生效
 
 ## 目录结构
 
@@ -90,6 +104,6 @@ src/
 │   ├── ImageLoaderTask.*    QRunnable 文件解码
 │   └── BatchController.*    批量调度 + 两级背压
 └── views/                   页面与自定义图元
-resources/                   QSS 主题 + qrc
+resources/                   QSS 主题 + qrc + i18n/*.ts
 tests/                       Qt Test 单元测试
 ```

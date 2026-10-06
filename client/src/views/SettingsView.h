@@ -37,6 +37,7 @@ public slots:
 
 signals:
     void saved(bool restartRequested);
+    void restartAppRequested();   // 语言变更需要重建界面，采用重启应用的方式
 
 private slots:
     void save();
@@ -54,6 +55,7 @@ private:
     QDoubleSpinBox *m_confSpin   = nullptr;
     QDoubleSpinBox *m_iouSpin    = nullptr;
     QComboBox      *m_imgszCombo = nullptr;
+    QComboBox      *m_languageCombo = nullptr;
     QPushButton    *m_saveButton = nullptr;
 
     BackendStatusView *m_statusView = nullptr;

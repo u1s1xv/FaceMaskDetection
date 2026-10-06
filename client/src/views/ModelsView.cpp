@@ -17,7 +17,7 @@ ModelsView::ModelsView(QWidget *parent)
     buildUi();
     m_defaultModel = QSettings().value(QStringLiteral("infer/model")).toString();
     m_currentDefault->setText(m_defaultModel.isEmpty()
-                                  ? QStringLiteral("（自动选择 *_best.pt）")
+                                  ? tr("（自动选择 *_best.pt）")
                                   : m_defaultModel);
 }
 
@@ -26,7 +26,7 @@ void ModelsView::buildUi()
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(8, 8, 8, 8);
 
-    auto *header = new QGroupBox(QStringLiteral("当前默认模型"), this);
+    auto *header = new QGroupBox(tr("当前默认模型"), this);
     auto *headerLayout = new QHBoxLayout(header);
     m_currentDefault = new QLabel(header);
     m_currentDefault->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -37,8 +37,8 @@ void ModelsView::buildUi()
     root->addWidget(header);
 
     auto *toolbar = new QHBoxLayout;
-    auto *refresh = new QPushButton(QStringLiteral("重新扫描"), this);
-    m_setDefaultButton = new QPushButton(QStringLiteral("设为默认"), this);
+    auto *refresh = new QPushButton(tr("重新扫描"), this);
+    m_setDefaultButton = new QPushButton(tr("设为默认"), this);
     m_setDefaultButton->setEnabled(false);
     toolbar->addWidget(refresh);
     toolbar->addWidget(m_setDefaultButton);
@@ -48,9 +48,9 @@ void ModelsView::buildUi()
     root->addLayout(toolbar);
 
     m_table = new QTableWidget(0, 3, this);
-    m_table->setHorizontalHeaderLabels({ QStringLiteral("权重文件"),
-                                         QStringLiteral("体积 (MB)"),
-                                         QStringLiteral("修改时间") });
+    m_table->setHorizontalHeaderLabels({ tr("权重文件"),
+                                         tr("体积 (MB)"),
+                                         tr("修改时间") });
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
@@ -100,7 +100,7 @@ void ModelsView::setModels(const QVector<ModelInfo> &models)
             nameItem->setForeground(QBrush(QColor(26, 127, 55)));
         }
     }
-    m_summary->setText(QStringLiteral("共 %1 个权重").arg(models.size()));
+    m_summary->setText(tr("共 %1 个权重").arg(models.size()));
 }
 
 int ModelsView::modelCount() const
@@ -139,7 +139,7 @@ void ModelsView::setSelectedAsDefault()
     m_currentDefault->setText(name);
     setModelsFromCurrentTable();          // 刷新加粗高亮
     emit defaultModelChanged(name);
-    emit statusMessage(QStringLiteral("默认模型已切换为 %1").arg(name));
+    emit statusMessage(tr("默认模型已切换为 %1").arg(name));
 }
 
 void ModelsView::setModelsFromCurrentTable()

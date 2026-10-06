@@ -22,14 +22,14 @@ void ImageLoaderTask::run()
 
     QFile file(m_filePath);
     if (!file.open(QIODevice::ReadOnly)) {
-        emit failed(m_filePath, QStringLiteral("无法打开文件：%1").arg(file.errorString()));
+        emit failed(m_filePath, tr("无法打开文件：%1").arg(file.errorString()));
         return;
     }
     const QByteArray raw = file.readAll();
     file.close();
 
     if (raw.isEmpty()) {
-        emit failed(m_filePath, QStringLiteral("文件为空"));
+        emit failed(m_filePath, tr("文件为空"));
         return;
     }
 
@@ -43,7 +43,7 @@ void ImageLoaderTask::run()
     const QImage image = reader.read();
     if (image.isNull()) {
         emit failed(m_filePath,
-                    QStringLiteral("图片解码失败：%1").arg(reader.errorString()));
+                    tr("图片解码失败：%1").arg(reader.errorString()));
         return;
     }
 
