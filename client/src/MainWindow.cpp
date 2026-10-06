@@ -141,6 +141,12 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow() = default;
 
+void MainWindow::switchToPage(int index)
+{
+    if (m_nav && index >= 0 && index < m_nav->count())
+        m_nav->setCurrentRow(index);
+}
+
 void MainWindow::applyStoredSettings()
 {
     m_proc->setPort(SettingsView::configuredPort());

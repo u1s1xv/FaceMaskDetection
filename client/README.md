@@ -25,7 +25,11 @@
 build.bat
 ```
 
-脚本会依次执行 `vcvars64` → `cmake 配置` → `ninja 构建`，产物在 `build\fmd_client.exe`。
+脚本会依次执行 `vcvars64` → `cmake 配置` → `ninja 构建` → **windeployqt 部署 Qt 运行时**，
+产物在 `build\fmd_client.exe`，**可以直接双击运行**（Qt DLL 已拷到旁边）。
+
+> 部署这一步不是可选的：本机 PATH 上有另一套（MinGW 版）Qt，
+> 如果 exe 旁边没有自己的 Qt DLL，运行时会加载到不兼容的那套而报错。详见「故障排查」。
 
 ## 运行
 
@@ -71,8 +75,50 @@ run_tests.bat
 | `--benchmark <图片> <N>` | 性能基准，输出 Markdown 表格 |
 | `--check-i18n --lang <语言>` | 国际化：验证翻译文件加载与关键字符串命中 |
 | `--list-langs` | 列出可用界面语言 |
+| `--screenshot <png> [页号] [等待ms]` | 用 Qt 自己渲染窗口存图，用于界面评审 |
+| `--dump-layout` | 打印屏幕信息与整棵控件树的几何数据，排查布局问题 |
 
 全部通过时退出码为 0。
+
+## 故障排查
+
+### 弹窗「无法定位程序输入点 ?viewportSizeHint@QTableView@@...」
+
+**原因**：exe 链接的是 `D:\Qt\5.15.2\msvc2019_64`（MSVC 版），运行时却加载到了
+PATH 上另一套 Qt —— 本机 PATH 里有 `D:\Qt\5.15.2\mingw81_64\bin`（**MinGW 版**），
+两者 ABI 不兼容，符号对不上。
+
+**为什么现在不该再出现**：`build.bat` 构建后会自动跑 windeployqt，把 Qt DLL 与插件拷到
+`build\` 目录。Windows 的 DLL 搜索顺序是「exe 目录 > 系统目录 > PATH」，exe 旁边有正确的 Qt
+就不会被 PATH 抢走。
+
+**若仍然出现**，检查三件事：
+
+```bat
+REM 1) build 目录里是否有 Qt5Core/Gui/Widgets/Network.dll 与 platforms\qwindows.dll
+dir build\Qt5*.dll
+dir build\platforms
+
+REM 2) 这些 DLL 是否来自 D:\Qt（而不是别处）
+powershell -Command "Get-ChildItem build\Qt5*.dll | %% { $_.Name + ' ' + (Get-FileHash $_.FullName).Hash.Substring(0,8) }"
+
+REM 3) 重新执行完整构建（含部署步骤）
+build.bat
+```
+
+> 另一个独立问题：**改过公共头文件后如果出现莫名崩溃（堆损坏 0xC0000374）**，
+> 先执行 `rmdir /s /q build` 再重新构建。增量构建有时不会重编所有依赖方，
+> 导致不同编译单元对同一结构体的内存布局理解不一致。
+
+### 界面某个面板看起来"不见了"
+
+先别下结论 —— **用 `CopyFromScreen` 截的图不可信**：截图进程若是 DPI-unaware 的，
+在高缩放屏幕上会拿到被虚拟化处理的画面。正确做法：
+
+```bat
+build\fmd_client.exe --dump-layout          REM 看控件几何数据（权威）
+build\fmd_client.exe --screenshot ui.png 0  REM 用 Qt 自己渲染存图
+```
 
 ## 国际化
 

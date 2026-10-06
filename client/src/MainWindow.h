@@ -33,6 +33,9 @@ public:
     BatchView     *batchView() const { return m_batchView; }
     HistoryView   *historyView() const { return m_historyView; }
     ModelsView    *modelsView() const { return m_modelsView; }
+
+    // 供脚本化截图/自动化切换页面
+    void switchToPage(int index);
     BackendClient *client() const { return m_client; }
     bool isBackendConnected() const { return m_connected; }
 

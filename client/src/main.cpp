@@ -14,6 +14,8 @@
 #include <QEventLoop>
 #include <QFile>
 #include <QLibraryInfo>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QLocale>
 #include <QTranslator>
 #include <QDir>
@@ -830,6 +832,81 @@ int runI18nCheck(bool sourceLanguage)
     return translated == total ? 0 : 1;
 }
 
+// 布局诊断：把窗口的控件树与几何信息打出来。
+// 界面上"某个面板不见了"这类问题，靠截图猜像素很不可靠，直接看几何数据最快。
+static void dumpWidgetTree(QWidget *widget, int depth, int maxDepth)
+{
+    if (!widget || depth > maxDepth)
+        return;
+
+    const QString indent(depth * 2, QLatin1Char(' '));
+    qInfo().noquote() << QString("%1%2  pos=(%3,%4)  size=%5x%6  visible=%7")
+                             .arg(indent)
+                             .arg(QString::fromLatin1(widget->metaObject()->className()), -22)
+                             .arg(widget->x()).arg(widget->y())
+                             .arg(widget->width()).arg(widget->height())
+                             .arg(widget->isVisible() ? "yes" : "NO");
+
+    const QObjectList children = widget->children();
+    for (QObject *child : children) {
+        if (auto *childWidget = qobject_cast<QWidget *>(child))
+            dumpWidgetTree(childWidget, depth + 1, maxDepth);
+    }
+}
+
+// 用 Qt 自己渲染窗口并保存 PNG。
+// 不用 CopyFromScreen：那个 PowerShell 进程是 DPI-unaware 的，
+// 在 200% 缩放的屏幕上截到的是被虚拟化处理过的桌面，会误判布局。
+// QWidget::grab() 直接走 Qt 的绘制路径，不受屏幕 DPI 虚拟化影响。
+int runScreenshot(const QString &path, int page, int waitMs)
+{
+    fmd::MainWindow window;
+    window.resize(1280, 800);
+    window.show();
+
+    QEventLoop loop;
+    QTimer::singleShot(waitMs, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    window.switchToPage(page);
+    QEventLoop settle;
+    QTimer::singleShot(800, &settle, &QEventLoop::quit);
+    settle.exec();
+
+    const QPixmap shot = window.grab();
+    if (shot.isNull() || !shot.save(path)) {
+        qCritical().noquote() << "[FAIL] 截图保存失败:" << path;
+        return 1;
+    }
+    qInfo().noquote() << "[OK] 截图已保存:" << path
+                      << QString("%1x%2").arg(shot.width()).arg(shot.height());
+    return 0;
+}
+
+int runLayoutDump()
+{
+    fmd::MainWindow window;
+    window.show();
+
+    QEventLoop loop;
+    QTimer::singleShot(4000, &loop, &QEventLoop::quit);   // 等布局稳定
+    loop.exec();
+
+    qInfo().noquote() << "=== 屏幕信息 ===";
+    for (QScreen *screen : QGuiApplication::screens()) {
+        qInfo().noquote() << QString("  逻辑DPI=%1  物理DPI=%2  可用区域=%3x%4  缩放=%5")
+                                 .arg(screen->logicalDotsPerInch())
+                                 .arg(screen->physicalDotsPerInch())
+                                 .arg(screen->availableGeometry().width())
+                                 .arg(screen->availableGeometry().height())
+                                 .arg(screen->devicePixelRatio());
+    }
+
+    qInfo().noquote() << "=== 控件树 ===";
+    dumpWidgetTree(&window, 0, 6);
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -852,6 +929,17 @@ int main(int argc, char *argv[])
 
     const QStringList args = app.arguments();
 
+    // 样式表编译进可执行文件（resources.qrc），无需外部文件。
+    // 放在模式分派之前，保证截图、冒烟测试等所有模式看到的都是真实主题，
+    // 否则这些自动化模式渲染的是无主题界面，会误导界面评审。
+    {
+        QFile styleFile(QStringLiteral(":/style.qss"));
+        if (styleFile.open(QIODevice::ReadOnly | QIODevice::Text))
+            app.setStyleSheet(QString::fromUtf8(styleFile.readAll()));
+        else
+            qWarning().noquote() << "样式表 :/style.qss 加载失败，界面将使用 Qt 默认外观";
+    }
+
     // 翻译要在任何界面构造之前装好
     const QString language = resolveLanguage(args);
     const bool loaded = installTranslator(app, language);
@@ -865,6 +953,19 @@ int main(int argc, char *argv[])
         const int rc = runI18nCheck(isSourceLanguage);
         qInfo().noquote() << (rc == 0 ? "=== 国际化检查通过 ===" : "=== 国际化检查失败 ===");
         return rc;
+    }
+
+    if (args.contains(QStringLiteral("--dump-layout")))
+        return runLayoutDump();
+
+    const int shotIdx = args.indexOf(QStringLiteral("--screenshot"));
+    if (shotIdx >= 0) {
+        const QString path = (shotIdx + 1 < args.size())
+                                 ? args.at(shotIdx + 1)
+                                 : QStringLiteral("screenshot.png");
+        const int page = (shotIdx + 2 < args.size()) ? args.at(shotIdx + 2).toInt() : 0;
+        const int wait = (shotIdx + 3 < args.size()) ? args.at(shotIdx + 3).toInt() : 6000;
+        return runScreenshot(path, page, wait);
     }
 
     if (args.contains(QStringLiteral("--list-langs"))) {
@@ -929,15 +1030,6 @@ int main(int argc, char *argv[])
             return 2;
         }
         return runBenchmark(imagePath, iterations);
-    }
-
-    qInfo().noquote() << "Qt runtime :" << qVersion();
-
-    // 样式表编译进可执行文件（resources.qrc），无需外部文件
-    {
-        QFile styleFile(QStringLiteral(":/style.qss"));
-        if (styleFile.open(QIODevice::ReadOnly | QIODevice::Text))
-            app.setStyleSheet(QString::fromUtf8(styleFile.readAll()));
     }
 
     fmd::MainWindow window;

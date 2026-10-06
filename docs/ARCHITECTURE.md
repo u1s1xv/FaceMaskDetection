@@ -132,6 +132,30 @@ Windows 上这是必踩的坑：
 
 ---
 
+### 2.9 部署：为什么构建产物必须自带 Qt 运行时
+
+这不是"锦上添花的打包步骤"，而是**让程序能跑起来的必要条件**。
+
+现象：在开发机上直接双击 `build\fmd_client.exe`，弹窗报
+「无法定位程序输入点 `?viewportSizeHint@QTableView@@MEBA?AVQSize@@XZ`」。
+
+排查过程（不靠猜，按顺序验证）：
+
+1. `dumpbin /DEPENDENTS fmd_client.exe` 拿到 exe 依赖的四个 Qt DLL
+2. 按 Windows 的 DLL 搜索顺序（exe 目录 → System32 → PATH 逐条）逐个探测，
+   打印每个 DLL **实际会被加载的完整路径**
+3. 四个 DLL 全部指向 `D:\Qt\5.15.2\mingw81_64\bin\` —— MinGW 构建的 Qt，
+   与 MSVC 编译的 exe **ABI 不兼容**，符号自然对不上
+
+根因：该目录在本机 PATH 上，而 `build\` 目录里没有 Qt DLL。
+
+修法：CMake 加 POST_BUILD 调 windeployqt，把 Qt DLL 与插件（platforms / imageformats 等）
+拷到可执行文件旁边。此后无论 PATH 上有多少套别的 Qt 都不受影响。
+
+> **教训**：这类问题在开发时极易被掩盖 —— 如果测试脚本每次都先
+> `PATH=D:\Qt\...\msvc2019_64\bin;$PATH` 再运行，就等于每次都在替程序挡住这个坑。
+> **测试要尽量贴近用户的实际运行方式。**
+
 ## 3. 线程模型
 
 ```
@@ -163,6 +187,8 @@ BatchController 调度器
 | **改动公共头文件后的陈旧目标文件** | 程序启动即崩（堆损坏 0xC0000374） | 给 ``DetectionResult`` 加字段后，部分编译单元仍用旧结构体布局 → ABI 不一致。**改公共数据结构后必须干净重建**。踩了两次 |
 | **ThreadingHTTPServer + 非线程安全模型** | 批量并发时随机失败 | 见 2.5 |
 | **Qt5 高 DPI 不生效** | 界面模糊 | Qt5 必须手动设 ``AA_EnableHighDpiScaling``，且要在 QApplication 构造**之前**（Qt6 才自动） |
+| **运行时加载到错误的 Qt**（最严重） | 双击 exe 弹「无法定位程序输入点 ?viewportSizeHint@QTableView@@...」 | exe 链接的是 D:\Qt 的 MSVC 版 Qt，但本机 PATH 上有 D:\Qt\5.15.2\mingw81_64\bin（**MinGW 版**，ABI 不兼容）。Windows 的 DLL 搜索顺序是「exe 目录 > 系统目录 > PATH」，而 build 目录里没有 Qt DLL，于是沿 PATH 抓到了 MinGW 那套。**修法：构建后用 windeployqt 把 Qt 运行时拷到 exe 旁边**。见 2.9 |
+| **用 CopyFromScreen 截图会误判布局** | 截图里右侧面板"不见了" | 做截图的 PowerShell 进程是 DPI-unaware 的，在 200% 缩放屏上拿到的是被虚拟化缩放的桌面。**修法：用 QWidget::grab() 让 Qt 自己渲染**（--screenshot 模式），或先看控件几何数据（--dump-layout）再下结论 |
 
 ---
 
