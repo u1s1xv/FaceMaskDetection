@@ -140,7 +140,8 @@ deploy.bat           REM 产物在 dist\，可直接拷到其它机器运行
 - **原图为什么要设保留策略** —— 每检测一次存一份原图，无上限时几千次就能撑到 GB 级；以及为什么清理必须放后台线程
 - **视频采集为什么用 latest-frame-wins 而不是队列** —— 排队会让延迟持续累积，实时系统宁可掉帧不要延迟
 
-实时检测的完整规划见 **[docs/ROADMAP.md](docs/ROADMAP.md)**（含实测的性能预算与阶段划分）。
+实时检测的设计决策见 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** 2.13/2.14，
+性能预算见 **[docs/BENCHMARK.md](docs/BENCHMARK.md)**。
 
 ## 项目结构
 
@@ -150,7 +151,7 @@ FaceMaskDetection/
 ├── server/                     【产品】Python 推理服务（仅标准库）
 ├── yoloserver/                 【资产】模型权重与训练/转换工具链
 ├── crawler_script/             【工具】数据集爬取
-├── docs/                       【文档】架构、性能、计划、截图
+├── docs/                       【文档】架构取舍、实测数据、待办、截图
 └── data/                       【运行期】历史库与原图（已 gitignore）
 ```
 
@@ -251,7 +252,6 @@ yoloserver/
 docs/
 ├── ARCHITECTURE.md             设计决策与理由（含踩过的坑与取舍）
 ├── BENCHMARK.md                全部实测数据（渲染方案、并发、后端优化）
-├── ROADMAP.md                  阶段计划与已完成情况
 ├── TODO.md                     已知问题与后续方向  ← 想接着做就看这个
 ├── REFACTOR_PLAN.md            从 Django Web 版改造为桌面端的完整记录
 ├── screenshots/                界面截图（README 中引用）
