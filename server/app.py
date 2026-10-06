@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -23,7 +24,8 @@ import numpy as np
 
 from detector import get_detector, MODELS_DIR
 from llm import stream_analysis, api_key_configured, AVAILABLE_MODELS, DEFAULT_MODEL
-from storage import get_store, DB_PATH, UPLOAD_DIR, DATA_DIR
+from storage import (get_store, DB_PATH, UPLOAD_DIR, DATA_DIR,
+                     UPLOAD_RETENTION_DAYS, UPLOAD_MAX_MB)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -305,6 +307,31 @@ def main():
     logger.info("推理服务已启动: http://%s:%d", args.host, args.port)
     logger.info("模型目录: %s", MODELS_DIR)
     logger.info("历史库:   %s", DB_PATH)
+
+    # 按保留策略清理历史原图。
+    #
+    # 必须放在后台线程：这段代码位于 serve_forever() 之前，同步执行时
+    # 服务会在整个清理期间不接受连接，客户端健康检查会判定"后端启动失败"。
+    #
+    # 清理耗时取决于待删文件数。实测删除速度约 15 ms/个（Windows Defender
+    # 实时扫描所致，与代码无关，详见 storage.cleanup_uploads 的说明），
+    # 上百个文件就是秒级，放在启动路径上一定会被用户感知到。
+    #
+    # 用 daemon 线程：服务退出时不需要等它，也不会拖住进程结束。
+    def _cleanup_worker():
+        try:
+            removed, freed = get_store().cleanup_uploads()
+            if removed:
+                logger.info("原图清理: %d 个文件 / %.1f MB", removed, freed / 1024 / 1024)
+            else:
+                logger.info("原图清理: 无需清理（保留 %d 天 / 上限 %d MB）",
+                            UPLOAD_RETENTION_DAYS, UPLOAD_MAX_MB)
+        except Exception as exc:                   # noqa: BLE001
+            # 清理失败绝不能影响推理服务
+            logger.warning("原图清理失败（已忽略）: %s", exc)
+
+    threading.Thread(target=_cleanup_worker, name="upload-cleanup", daemon=True).start()
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
