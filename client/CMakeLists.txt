@@ -33,6 +33,8 @@ set(FMD_SOURCES
     src/core/BackendClient.cpp
     src/core/SseParser.h
     src/core/SseParser.cpp
+    src/core/MjpegParser.h
+    src/core/MjpegParser.cpp
     src/core/BackendProcess.h
     src/core/BackendProcess.cpp
     src/core/ChildProcessJob.h
@@ -61,6 +63,10 @@ set(FMD_SOURCES
     src/views/ImageCanvas.cpp
     src/views/DetectionItem.h
     src/views/DetectionItem.cpp
+    src/views/VideoWidget.h
+    src/views/VideoWidget.cpp
+    src/views/LiveView.h
+    src/views/LiveView.cpp
     src/widgets/PageHeader.h
     src/widgets/PageHeader.cpp
     src/widgets/StatCard.h

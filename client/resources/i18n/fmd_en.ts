@@ -13,10 +13,40 @@ Box (%3, %4) - (%5, %6)</translation>
     </message>
 </context>
 <context>
+    <name>LiveView</name>
+    <message>
+        <source>正确佩戴</source>
+        <translation type="unfinished">Wearing correctly</translation>
+    </message>
+    <message>
+        <source>未佩戴</source>
+        <translation type="unfinished">Not wearing</translation>
+    </message>
+    <message>
+        <source>佩戴不规范</source>
+        <translation type="unfinished">Worn incorrectly</translation>
+    </message>
+</context>
+<context>
     <name>Protocol</name>
     <message>
         <source>服务端返回失败但未给出原因</source>
         <translation>Server reported failure but gave no reason</translation>
+    </message>
+</context>
+<context>
+    <name>fmd::BackendClient</name>
+    <message>
+        <source>服务端结束了推流</source>
+        <translation>The server closed the stream</translation>
+    </message>
+    <message>
+        <source>已停止</source>
+        <translation>Stopped</translation>
+    </message>
+    <message>
+        <source>多次重连仍未收到画面</source>
+        <translation>Still no frames after several reconnects</translation>
     </message>
 </context>
 <context>
@@ -55,11 +85,11 @@ Box (%3, %4) - (%5, %6)</translation>
     </message>
     <message>
         <source>[守护] 服务进程已纳入作业对象，客户端退出时会一并终止</source>
-        <translation type="unfinished"></translation>
+        <translation>[guardian] Service process added to a job object; it will be terminated with the client</translation>
     </message>
     <message>
         <source>[守护] 警告：作业对象保护未生效，异常退出可能留下孤儿进程</source>
-        <translation type="unfinished"></translation>
+        <translation>[guardian] Warning: job object protection is inactive; an abnormal exit may leave an orphan process</translation>
     </message>
 </context>
 <context>
@@ -282,17 +312,19 @@ Error: %2</translation>
     </message>
     <message>
         <source>选中左侧任意一行，查看该图片的检测结果</source>
-        <translation type="unfinished"></translation>
+        <translation>Select any row on the left to see that image&apos;s detection result</translation>
     </message>
     <message>
         <source>%1
 
 该图片还没有检测结果（未处理或已失败）</source>
-        <translation type="unfinished"></translation>
+        <translation>%1
+
+No detection result for this image yet (not processed, or failed)</translation>
     </message>
     <message>
         <source>#%1  %2  置信度 %3  框(%4,%5)-(%6,%7)</source>
-        <translation type="unfinished"></translation>
+        <translation>#%1  %2  conf %3  box(%4,%5)-(%6,%7)</translation>
     </message>
     <message>
         <source>（未检测到目标）</source>
@@ -300,11 +332,11 @@ Error: %2</translation>
     </message>
     <message>
         <source>%1 ｜ 共 %2 个目标 ｜ 记录 #%3</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 | %2 targets | record #%3</translation>
     </message>
     <message>
         <source>无法加载预览：%1</source>
-        <translation type="unfinished"></translation>
+        <translation>Cannot load preview: %1</translation>
     </message>
     <message>
         <source>批量检测</source>
@@ -313,7 +345,8 @@ Error: %2</translation>
     <message>
         <source>一次添加多张图片或整个文件夹，客户端按设定并发数排队调度，服务端串行推理。
 双击结果表中的任意一行可跳转到单图页查看原图。</source>
-        <translation type="unfinished"></translation>
+        <translation>Add several images or a whole folder at once. The client queues them by the configured concurrency; the server runs inference serially.
+Double-click any row to open the original image on the single-image page.</translation>
     </message>
 </context>
 <context>
@@ -478,19 +511,19 @@ Error: %2</translation>
     </message>
     <message>
         <source>单图检测</source>
-        <translation type="unfinished"></translation>
+        <translation>Single Image</translation>
     </message>
     <message>
         <source>拖入或打开一张图片，调用本地推理服务检测口罩佩戴情况。每次检测都会自动存入历史记录。</source>
-        <translation type="unfinished"></translation>
+        <translation>Drop in or open an image; the local inference service detects mask usage. Every detection is stored in history automatically.</translation>
     </message>
     <message>
         <source>把图片拖到这里，或点击右侧「打开图片」</source>
-        <translation type="unfinished"></translation>
+        <translation>Drop an image here, or click &quot;Open Image&quot; on the right</translation>
     </message>
     <message>
         <source>支持 JPG / PNG / BMP / WebP</source>
-        <translation type="unfinished"></translation>
+        <translation>Supports JPG / PNG / BMP / WebP</translation>
     </message>
 </context>
 <context>
@@ -602,7 +635,7 @@ Queued: %7 ms</translation>
     </message>
     <message>
         <source>正在加载记录 #%1 …</source>
-        <translation type="unfinished"></translation>
+        <translation>Loading record #%1 …</translation>
     </message>
     <message>
         <source>历史记录</source>
@@ -611,7 +644,8 @@ Queued: %7 ms</translation>
     <message>
         <source>每次检测都会自动入库。支持按文件名、时间、ID 搜索，也可以只看存在违规的记录。
 选中一行可在下方查看该次检测的标注结果。</source>
-        <translation type="unfinished"></translation>
+        <translation>Every detection is stored automatically. Search by file name, time or ID, or show only violations.
+Select a row to see that detection&apos;s annotated result below.</translation>
     </message>
 </context>
 <context>
@@ -627,6 +661,179 @@ Queued: %7 ms</translation>
     <message>
         <source>图片解码失败：%1</source>
         <translation>Image decode failed: %1</translation>
+    </message>
+</context>
+<context>
+    <name>fmd::LiveView</name>
+    <message>
+        <source>实时监控</source>
+        <translation>Live Monitor</translation>
+    </message>
+    <message>
+        <source>接入 USB 摄像头、RTSP 网络流或视频文件，服务端边采集边推理，画面以 MJPEG 推送到这里。
+检测框由服务端绘制在画面上 —— 这样框和画面永远同步，不会出现&quot;框在画面外飘&quot;。</source>
+        <translation>Connect a USB camera, RTSP stream or video file. The server captures and infers continuously and pushes frames here over MJPEG.
+Boxes are drawn server-side, so they always stay in sync with the picture — no boxes drifting off the image.</translation>
+    </message>
+    <message>
+        <source>摄像头</source>
+        <translation>Camera</translation>
+    </message>
+    <message>
+        <source>刷新</source>
+        <translation type="unfinished">Refresh</translation>
+    </message>
+    <message>
+        <source>或指定源</source>
+        <translation>Or a source</translation>
+    </message>
+    <message>
+        <source>视频文件路径 / rtsp://…</source>
+        <translation>Video file path / rtsp://…</translation>
+    </message>
+    <message>
+        <source>打开</source>
+        <translation>Open</translation>
+    </message>
+    <message>
+        <source>关闭</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <source>尚未接入视频源</source>
+        <translation>No video source connected</translation>
+    </message>
+    <message>
+        <source>画面</source>
+        <translation>Video</translation>
+    </message>
+    <message>
+        <source>分辨率</source>
+        <translation>Resolution</translation>
+    </message>
+    <message>
+        <source>接收帧率</source>
+        <translation>Receive rate</translation>
+    </message>
+    <message>
+        <source>码率</source>
+        <translation>Bitrate</translation>
+    </message>
+    <message>
+        <source>累计帧数</source>
+        <translation>Frames received</translation>
+    </message>
+    <message>
+        <source>推理</source>
+        <translation>Inference</translation>
+    </message>
+    <message>
+        <source>推理耗时</source>
+        <translation>Inference time</translation>
+    </message>
+    <message>
+        <source>端到端延迟</source>
+        <translation>End-to-end latency</translation>
+    </message>
+    <message>
+        <source>单帧大小</source>
+        <translation>Frame size</translation>
+    </message>
+    <message>
+        <source>当前画面目标</source>
+        <translation>Targets in view</translation>
+    </message>
+    <message>
+        <source>正确佩戴</source>
+        <translation type="unfinished">Wearing correctly</translation>
+    </message>
+    <message>
+        <source>未佩戴</source>
+        <translation type="unfinished">Not wearing</translation>
+    </message>
+    <message>
+        <source>佩戴不规范</source>
+        <translation type="unfinished">Worn incorrectly</translation>
+    </message>
+    <message>
+        <source>没有可用的摄像头。可以改为在右侧填入视频文件路径或 RTSP 地址。</source>
+        <translation>No camera available. Enter a video file path or RTSP URL in the field instead.</translation>
+    </message>
+    <message>
+        <source>正在打开摄像头 %1 …</source>
+        <translation>Opening camera %1 …</translation>
+    </message>
+    <message>
+        <source>正在打开 %1 …</source>
+        <translation>Opening %1 …</translation>
+    </message>
+    <message>
+        <source>摄像头 %1（%2 %3x%4）</source>
+        <translation>Camera %1 (%2 %3x%4)</translation>
+    </message>
+    <message>
+        <source>（未检测到摄像头）</source>
+        <translation>(no camera detected)</translation>
+    </message>
+    <message>
+        <source>已接入 %1（%2，后端 %3）</source>
+        <translation>Connected to %1 (%2, backend %3)</translation>
+    </message>
+    <message>
+        <source>视频源 %1 已接入</source>
+        <translation>Video source %1 connected</translation>
+    </message>
+    <message>
+        <source>视频源已关闭</source>
+        <translation>Video source closed</translation>
+    </message>
+    <message>
+        <source>视频源 %1 已关闭</source>
+        <translation>Video source %1 closed</translation>
+    </message>
+    <message>
+        <source>正在接收 %1 的画面…</source>
+        <translation>Receiving frames from %1 …</translation>
+    </message>
+    <message>
+        <source>画面已停止：%1</source>
+        <translation>Video stopped: %1</translation>
+    </message>
+    <message>
+        <source>推流中断：%1</source>
+        <translation>Stream interrupted: %1</translation>
+    </message>
+    <message>
+        <source>操作失败：%1</source>
+        <translation>Operation failed: %1</translation>
+    </message>
+    <message>
+        <source>打开视频源失败</source>
+        <translation>Failed to open the video source</translation>
+    </message>
+    <message>
+        <source>%1 FPS</source>
+        <translation>%1 FPS</translation>
+    </message>
+    <message>
+        <source>%1 KB/s</source>
+        <translation>%1 KB/s</translation>
+    </message>
+    <message>
+        <source>%1 ms</source>
+        <translation>%1 ms</translation>
+    </message>
+    <message>
+        <source>%1 KB</source>
+        <translation>%1 KB</translation>
+    </message>
+    <message>
+        <source>%1  置信度 %2  框(%3,%4)-(%5,%6)</source>
+        <translation>%1  conf %2  box(%3,%4)-(%5,%6)</translation>
+    </message>
+    <message>
+        <source>（当前画面没有检测到目标）</source>
+        <translation>(no target detected in the current view)</translation>
     </message>
 </context>
 <context>
@@ -780,7 +987,11 @@ Queued: %7 ms</translation>
     </message>
     <message>
         <source>重启失败，请手动重新打开程序</source>
-        <translation type="unfinished"></translation>
+        <translation>Restart failed; please reopen the application manually</translation>
+    </message>
+    <message>
+        <source>实时监控</source>
+        <translation>Live Monitor</translation>
     </message>
 </context>
 <context>
@@ -827,7 +1038,7 @@ Queued: %7 ms</translation>
     </message>
     <message>
         <source>扫描 yoloserver/models/checkpoints/ 下的权重文件。把训练好的 .pt 放进去后点「重新扫描」即可出现。</source>
-        <translation type="unfinished"></translation>
+        <translation>Scans weight files under yoloserver/models/checkpoints/. Drop a trained .pt there and click Rescan to make it appear.</translation>
     </message>
 </context>
 <context>
@@ -910,20 +1121,21 @@ Queued: %7 ms</translation>
     </message>
     <message>
         <source>界面语言</source>
-        <translation type="unfinished"></translation>
+        <translation>UI language</translation>
     </message>
     <message>
         <source>语言</source>
-        <translation type="unfinished"></translation>
+        <translation>Language</translation>
     </message>
     <message>
         <source>源码以中文编写，中文无需翻译文件；英文由 Qt Linguist 的 .ts/.qm 提供。
 切换语言需要重建界面，保存后可点下方按钮立即重启应用。</source>
-        <translation type="unfinished"></translation>
+        <translation>Source strings are written in Chinese, so Chinese needs no translation file; English comes from Qt Linguist .ts/.qm files.
+Switching language rebuilds the UI — after saving, use the button below to restart immediately.</translation>
     </message>
     <message>
         <source>立即重启应用</source>
-        <translation type="unfinished"></translation>
+        <translation>Restart now</translation>
     </message>
     <message>
         <source>设置</source>
@@ -931,7 +1143,16 @@ Queued: %7 ms</translation>
     </message>
     <message>
         <source>配置推理服务的连接方式与默认推理参数。修改后点「保存」生效；改动端口或解释器时请用「保存并重启服务」。</source>
-        <translation type="unfinished"></translation>
+        <translation>Configure how the client reaches the inference service and the default inference parameters. Click Save to apply; use &quot;Save and Restart Service&quot; when changing the port or interpreter.</translation>
+    </message>
+</context>
+<context>
+    <name>fmd::VideoWidget</name>
+    <message>
+        <source>尚未开始实时预览
+选择摄像头后点击「打开」</source>
+        <translation>No live preview yet
+Choose a camera and click &quot;Open&quot;</translation>
     </message>
 </context>
 </TS>

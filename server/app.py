@@ -29,11 +29,27 @@ from camera import get_manager
 from storage import (get_store, DB_PATH, UPLOAD_DIR, DATA_DIR,
                      UPLOAD_RETENTION_DAYS, UPLOAD_MAX_MB)
 
+# 除了 stderr，同时写一份到 data/server.log。
+#
+# 为什么必须落盘：客户端把服务端当成子进程，它的 stderr 被客户端管道接走了，
+# 只在界面的日志面板里可见。一旦客户端异常退出，服务端最后那段（往往就是
+# 崩溃原因的 traceback）就永久丢失了 —— 排查间歇性故障时吃过这个亏。
+LOG_PATH = DATA_DIR / "server.log"
+try:
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _file_handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
+    _file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+except OSError:
+    _file_handler = None          # 写不了文件也不能挡住服务启动
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     stream=sys.stderr,
 )
+if _file_handler is not None:
+    logging.getLogger().addHandler(_file_handler)
 logger = logging.getLogger("fmd.server")
 
 API_VERSION = "0.2.0"
@@ -59,8 +75,22 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _read_body(self):
+        """取请求体。body 在 do_POST/do_DELETE 入口就已经读完了（见 _preload_body）。"""
+        return getattr(self, "_body", b"")
+
+    def _preload_body(self):
+        """在路由之前把请求体读干净。
+
+        为什么必须提前读：**任何不读 body 的 POST 处理器都会破坏 keep-alive 连接**。
+        没被读走的字节会留在 socket 缓冲里，被解析成下一个请求的起始行，
+        表现为服务端报 `Unsupported method ('{}GET')` 这种莫名其妙的错误。
+
+        实测踩到：客户端 POST /cameras/cam1/close 带了一个 2 字节的 `{}`，
+        而该处理器不读 body，紧接着的 GET /cameras 就被污染了。
+        """
         length = int(self.headers.get("Content-Length") or 0)
-        return self.rfile.read(length) if length > 0 else b""
+        self._body = self.rfile.read(length) if length > 0 else b""
+        return self._body
 
     def log_message(self, fmt, *args):
         logger.info("%s - %s", self.address_string(), fmt % args)
@@ -101,11 +131,25 @@ class Handler(BaseHTTPRequestHandler):
                 data["success"] = True
                 return self._send_json(data)
             if segs == ["cameras"]:
-                return self._send_json({
+                # 设备枚举是"便利功能"，它失败绝不能拖垮这个端点 ——
+                # 这个端点同时承载着推流状态，客户端每秒都要它。
+                # 枚举不出来时，用户仍可手动填视频源。
+                devices = []
+                devices_error = None
+                try:
+                    devices = get_manager().list_devices_cached()
+                except Exception as exc:               # noqa: BLE001
+                    logger.exception("枚举摄像头失败")
+                    devices_error = str(exc)
+
+                payload = {
                     "success": True,
-                    "devices": get_manager().list_devices_cached(),
+                    "devices": devices,
                     "opened": get_manager().list_opened(),
-                })
+                }
+                if devices_error:
+                    payload["devices_error"] = devices_error
+                return self._send_json(payload)
             if len(segs) == 3 and segs[0] == "cameras" and segs[2] == "stream.mjpg":
                 return self._stream_mjpeg(segs[1])
             if len(segs) == 3 and segs[0] == "cameras" and segs[2] == "stats":
@@ -182,6 +226,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         segs = self._segments(parsed.path)
         query = parse_qs(parsed.query)
+        self._preload_body()          # 必须在路由前，理由见该函数注释
         try:
             if segs == ["detect"]:
                 return self._detect(query)
@@ -228,14 +273,21 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
         interval = 1.0 / target_fps if target_fps > 0 else 0.0
-        last_seq = -1
+        # 初值必须与槽位的初始 seq 一致（都是 0），不能写 -1。
+        # 写成 -1 时 wait_newer 的 `_seq <= since_seq` 判断为假，会立即返回而不是等待，
+        # 于是推流线程变成死循环空转，用 GIL 把推理线程饿死 ——
+        # 表现是"连接建立了但一帧都没有"，10 秒后被空闲超时关闭。
+        last_seq = 0
         last_sent = 0.0
         idle_since = time.time()
         sent = 0
 
         try:
             while True:
-                seq, payload, _ = pipeline.peek_frame()
+                # 阻塞等待新帧，而不是"睡几毫秒再看一眼"。
+                # 轮询会让这个线程每秒唤醒 250 次抢 GIL，把推理线程也拖慢
+                # （实测双方帧率都被压低）。条件变量让它在没帧时真正让出 CPU。
+                seq, payload, _ = pipeline.wait_frame(last_seq, timeout=0.5)
                 now = time.time()
 
                 if payload is None:
@@ -244,19 +296,17 @@ class Handler(BaseHTTPRequestHandler):
                     if now - idle_since > idle_timeout:
                         logger.warning("推流 %s 空闲超时（管线无输出），结束连接", cam_id)
                         break
-                    time.sleep(0.004)
                     continue
 
                 # 只有"新帧"才发。同一帧重复发没有意义，也浪费带宽。
-                # 注意这里的判断顺序：必须先用旧值比较，再更新 last_seq。
-                # （初版写成了先赋值再比较，条件恒为真，导致一帧都发不出去。）
+                # 注意判断顺序：必须先用旧值比较，再更新 last_seq。
+                # （初版写成先赋值再比较，条件恒为真，一帧都发不出去。）
                 if seq == last_seq:
-                    time.sleep(0.004)
                     continue
 
                 # 限速：管线可能比目标帧率快
                 if interval > 0 and (now - last_sent) < interval:
-                    time.sleep(0.004)
+                    time.sleep(interval - (now - last_sent))
                     continue
 
                 jpeg = payload["jpeg"]
@@ -416,6 +466,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         segs = self._segments(parsed.path)
         query = parse_qs(parsed.query)
+        self._preload_body()          # DELETE 一般没有 body，但保持一致更安全
         try:
             if segs == ["history"]:
                 if _as_bool(self._one(query, "all"), False):

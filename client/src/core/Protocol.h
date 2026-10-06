@@ -5,6 +5,7 @@
 
 #include <QByteArray>
 #include <QHash>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QString>
 #include <QVector>
@@ -52,6 +53,54 @@ struct HistoryRecord {
 
     static HistoryRecord fromJson(const QJsonObject &obj);
     static QVector<HistoryRecord> listFromJson(const QJsonObject &obj);
+};
+
+// ---------------- 视频源 / 实时监控 ----------------
+
+// 本机可用的摄像头（由服务端枚举）
+struct CameraDevice {
+    int     index = 0;
+    QString backend;
+    int     width  = 0;
+    int     height = 0;
+
+    static QVector<CameraDevice> listFromJson(const QJsonArray &arr);
+};
+
+// 实时推理管线的运行状态（对应服务端的 LivePipeline.stats）
+struct LiveStats {
+    bool    running       = false;
+    int     processed     = 0;
+    double  inferMs       = 0.0;
+    double  e2eMs         = 0.0;
+    double  jpegKb        = 0.0;
+    int     droppedFrames = 0;
+    QString lastError;
+
+    // 最近一帧的检测结果
+    int     total = 0;
+    QHash<QString, int> counts;
+    QVector<Detection>  detections;
+
+    static LiveStats fromJson(const QJsonObject &obj);
+};
+
+// 一个已打开的视频源
+struct CameraInfo {
+    QString id;
+    QString name;
+    QString source;
+    QString kind;          // device / file / stream
+    QString backend;
+    double  fps    = 0.0;
+    int     frames = 0;
+    int     width  = 0;
+    int     height = 0;
+    bool    running = false;
+    LiveStats live;
+
+    static CameraInfo fromJson(const QJsonObject &obj);
+    static QVector<CameraInfo> listFromJson(const QJsonArray &arr);
 };
 
 struct ModelInfo {

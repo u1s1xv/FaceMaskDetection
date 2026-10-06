@@ -7,6 +7,7 @@
 #include "views/BatchView.h"
 #include "views/DetectView.h"
 #include "views/HistoryView.h"
+#include "views/LiveView.h"
 #include "views/ModelsView.h"
 #include "views/SettingsView.h"
 
@@ -52,6 +53,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_client, &BackendClient::modelsReceived, m_batchView,  &BatchView::setModels);
     connect(m_client, &BackendClient::modelsReceived, m_modelsView, &ModelsView::setModels);
     connect(m_client, &BackendClient::modelsReceived, m_settingsView, &SettingsView::setModels);
+
+    connect(m_liveView, &LiveView::statusMessage, this, [this](const QString &message) {
+        statusBar()->showMessage(message, 5000);
+    });
 
     connect(m_modelsView, &ModelsView::statusMessage, this, [this](const QString &message) {
         statusBar()->showMessage(message);
@@ -167,7 +172,9 @@ void MainWindow::buildUi()
 
     m_nav = new QListWidget(this);
     m_nav->setObjectName(QStringLiteral("navList"));   // 供 QSS 精确选中
+    // 顺序即页面索引，改动时记得同步 main.cpp 里 --screenshot 的页号映射
     m_nav->addItem(tr("检测"));
+    m_nav->addItem(tr("实时监控"));
     m_nav->addItem(tr("批量检测"));
     m_nav->addItem(tr("历史记录"));
     m_nav->addItem(tr("模型管理"));
@@ -182,11 +189,13 @@ void MainWindow::buildUi()
     m_statusView   = m_settingsView->statusView();
 
     m_detectView  = new DetectView(m_client, this);
+    m_liveView    = new LiveView(m_client, this);
     m_batchView   = new BatchView(m_client, this);
     m_historyView = new HistoryView(m_client, this);
     m_modelsView  = new ModelsView(this);
 
     m_pages->addWidget(m_detectView);
+    m_pages->addWidget(m_liveView);
     m_pages->addWidget(m_batchView);
     m_pages->addWidget(m_historyView);
     m_pages->addWidget(m_modelsView);

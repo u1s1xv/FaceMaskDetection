@@ -7,6 +7,8 @@
 
 #include "core/SseParser.h"
 
+#include "test_runner.h"
+
 class TestSseParser : public QObject
 {
     Q_OBJECT
@@ -151,5 +153,10 @@ void TestSseParser::byteByByteFeed()
     QCOMPARE(doneCount, 1);
 }
 
-QTEST_MAIN(TestSseParser)
+int runSseParserTests(int argc, char *argv[])
+{
+    TestSseParser test;
+    return QTest::qExec(&test, argc, argv);
+}
+
 #include "test_sseparser.moc"

@@ -114,6 +114,7 @@ class LivePipeline:
         self._running = False
         self._stats_lock = threading.Lock()
         self._processed = 0
+        self._latest_result = None      # 最近一次结构化结果（供 stats 查询，不消费）
         self._infer_ms = 0.0
         self._e2e_ms = 0.0
         self._last_error = ""
@@ -185,11 +186,14 @@ class LivePipeline:
                     "e2e_ms": e2e_ms,
                 }
                 self._frames.put(payload)
-                self._results.put({
+                entry = {
                     "seq": seq, "ts": ts, "detections": detections,
                     "counts": result.get("counts", {}),
                     "total": result.get("total_detections", 0),
-                })
+                }
+                self._results.put(entry)
+                with self._stats_lock:
+                    self._latest_result = entry
 
             except Exception as exc:                   # noqa: BLE001
                 with self._stats_lock:
@@ -199,8 +203,12 @@ class LivePipeline:
 
     # ------------------------------------------------------------ 读取
     def peek_frame(self):
-        """取最新标注帧（不消费）。推流用。"""
+        """取最新标注帧（不消费）。"""
         return self._frames.peek()
+
+    def wait_frame(self, since_seq, timeout=1.0):
+        """等一帧比 since_seq 更新的标注帧。推流端用它替代轮询。"""
+        return self._frames.wait_newer(since_seq, timeout)
 
     def read_result(self):
         """取最新结构化结果（消费）。统计/告警用。"""
@@ -218,4 +226,5 @@ class LivePipeline:
                 "dropped_frames": self._frames.dropped,
                 "jpeg_kb": round(len(payload["jpeg"]) / 1024, 1) if payload else 0,
                 "last_error": self._last_error,
+                "latest": self._latest_result,
             }

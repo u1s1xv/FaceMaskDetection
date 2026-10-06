@@ -11,9 +11,39 @@
     </message>
 </context>
 <context>
+    <name>LiveView</name>
+    <message>
+        <source>正确佩戴</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>未佩戴</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>佩戴不规范</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>Protocol</name>
     <message>
         <source>服务端返回失败但未给出原因</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>fmd::BackendClient</name>
+    <message>
+        <source>服务端结束了推流</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>已停止</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>多次重连仍未收到画面</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -617,6 +647,178 @@
     </message>
 </context>
 <context>
+    <name>fmd::LiveView</name>
+    <message>
+        <source>实时监控</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>接入 USB 摄像头、RTSP 网络流或视频文件，服务端边采集边推理，画面以 MJPEG 推送到这里。
+检测框由服务端绘制在画面上 —— 这样框和画面永远同步，不会出现&quot;框在画面外飘&quot;。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>摄像头</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>刷新</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>或指定源</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>视频文件路径 / rtsp://…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>打开</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>关闭</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>尚未接入视频源</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>画面</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>分辨率</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>接收帧率</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>码率</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>累计帧数</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>推理</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>推理耗时</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>端到端延迟</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>单帧大小</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>当前画面目标</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>正确佩戴</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>未佩戴</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>佩戴不规范</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>没有可用的摄像头。可以改为在右侧填入视频文件路径或 RTSP 地址。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>正在打开摄像头 %1 …</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>正在打开 %1 …</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>摄像头 %1（%2 %3x%4）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>（未检测到摄像头）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>已接入 %1（%2，后端 %3）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>视频源 %1 已接入</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>视频源已关闭</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>视频源 %1 已关闭</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>正在接收 %1 的画面…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>画面已停止：%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>推流中断：%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>操作失败：%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>打开视频源失败</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 FPS</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 KB/s</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 ms</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 KB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1  置信度 %2  框(%3,%4)-(%5,%6)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>（当前画面没有检测到目标）</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>fmd::LlmAnalysisDialog</name>
     <message>
         <source>AI 智能分析 — 记录 #%1</source>
@@ -769,6 +971,10 @@
         <source>重启失败，请手动重新打开程序</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>实时监控</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>fmd::ModelsView</name>
@@ -918,6 +1124,14 @@
     </message>
     <message>
         <source>配置推理服务的连接方式与默认推理参数。修改后点「保存」生效；改动端口或解释器时请用「保存并重启服务」。</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>fmd::VideoWidget</name>
+    <message>
+        <source>尚未开始实时预览
+选择摄像头后点击「打开」</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

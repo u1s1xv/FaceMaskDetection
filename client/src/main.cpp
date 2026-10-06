@@ -21,12 +21,14 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QDateTime>
 #include <QTimer>
 
 #include "MainWindow.h"
 #include "views/BatchView.h"
 #include "views/DetectView.h"
 #include "views/HistoryView.h"
+#include "views/LiveView.h"
 #include "views/ModelsView.h"
 #include <QSettings>
 #include "core/BackendClient.h"
@@ -402,6 +404,140 @@ int runBatchSmokeTest(const QString &imageDir, int limit)
 }
 
 // 历史记录冒烟测试：走通「列表 → 详情 → 原图」三级数据链路，并验证视图行数。
+// 实时监控冒烟测试：真的接入一个视频源，验证画面与检测结果都到了。
+//
+// 用视频文件当源（而不是真摄像头）是为了可复现 —— 换台机器也能跑。
+static qint64 m_liveFirstFrameMs = 0;   // 首帧到达时刻，用于算有效帧率
+
+int runLiveSmokeTest(const QString &source, int seconds)
+{
+    m_liveFirstFrameMs = 0;
+    fmd::MainWindow window;
+    window.show();
+    window.switchToPage(1);                   // 1 = 实时监控
+
+    QEventLoop loop;
+    int  exitCode = 1;
+    bool finished = false;
+    auto finish = [&](int code) {
+        if (finished) return;
+        finished = true;
+        exitCode = code;
+        loop.quit();
+    };
+
+    fmd::LiveView *live = window.liveView();
+    if (live == nullptr) {
+        qCritical().noquote() << "[FAIL] 拿不到实时监控页";
+        return 1;
+    }
+
+    QObject::connect(window.client(), &fmd::BackendClient::requestFailed,
+                     [&](const QString &op, const QString &err) {
+        if (!op.startsWith(QLatin1String("camera")))
+            return;
+        qCritical().noquote() << "[FAIL] " << op << err;
+        finish(1);
+    });
+
+    // 把服务端侧的数字也打出来。只看客户端收到的帧率无法判断瓶颈在哪：
+    //   服务端产得慢  -> 采集/推理/GIL 问题
+    //   服务端产得快  -> 客户端解码或绘制跟不上
+    // 推流为什么结束 —— 不打印原因就只能看到"没有画面"，无从下手
+    QObject::connect(window.client(), &fmd::BackendClient::streamStarted,
+                     [](const QString &camId) {
+        qInfo().noquote() << "[..] 推流已开始:" << camId;
+    });
+    QObject::connect(window.client(), &fmd::BackendClient::streamStopped,
+                     [](const QString &camId, const QString &reason) {
+        qInfo().noquote() << "[..] 推流结束:" << camId << "原因:" << reason;
+    });
+
+    bool reportServerSide = false;
+    QObject::connect(window.client(), &fmd::BackendClient::camerasReceived,
+                     [&](const QVector<fmd::CameraDevice> &,
+                         const QVector<fmd::CameraInfo> &opened) {
+        if (!reportServerSide)
+            return;
+        reportServerSide = false;
+        for (const fmd::CameraInfo &info : opened) {
+            if (info.id != live->currentCameraId())
+                continue;
+            qInfo().noquote() << QString("     服务端: 采集 %1 FPS | 推理 %2 ms | 端到端 %3 ms | 已处理 %4 帧")
+                                     .arg(info.fps, 0, 'f', 1)
+                                     .arg(info.live.inferMs, 0, 'f', 1)
+                                     .arg(info.live.e2eMs, 0, 'f', 1)
+                                     .arg(info.live.processed);
+        }
+    });
+
+    qInfo().noquote() << "[..] 打开视频源:" << source;
+    live->openSource(source);
+
+    // 计时必须从"第一帧到达"开始，不能从"发起打开"开始。
+    // 服务端要先加载模型（冷启动数秒），把这算进分母会把帧率算低一半以上，
+    // 看起来像性能问题，其实是测量方法的问题。
+    auto *warmupTimer = new QTimer(&window);
+    warmupTimer->setInterval(200);
+    QObject::connect(warmupTimer, &QTimer::timeout, [&, warmupTimer]() {
+        if (live->receivedFrames() > 0) {
+            warmupTimer->stop();
+            m_liveFirstFrameMs = QDateTime::currentMSecsSinceEpoch();
+            qInfo().noquote() << "[..] 首帧到达，开始计时";
+        }
+    });
+    warmupTimer->start();
+
+    QTimer::singleShot(seconds * 1000 + 15000, [&]() {
+        const int frames = live->receivedFrames();
+        const bool picture = live->hasPicture();
+        const bool streaming = live->isStreaming();
+        qInfo().noquote() << "[OK] 画面已收到=" << picture
+                          << "累计帧数=" << frames
+                          << "推流中=" << streaming
+                          << "视频源=" << live->currentCameraId();
+
+        // 只在"首帧之后"的窗口里算帧率
+        const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+        // 变量名别叫 window —— 会遮蔽上面的 MainWindow window
+        const double measureWindow = m_liveFirstFrameMs > 0
+                                         ? (nowMs - m_liveFirstFrameMs) / 1000.0
+                                         : 0.0;
+        const double fps = measureWindow > 0.5 ? double(frames) / measureWindow : 0.0;
+        qInfo().noquote() << QString("     客户端: 有效窗口 %1 秒，平均接收 %2 FPS")
+                                 .arg(measureWindow, 0, 'f', 1).arg(fps, 0, 'f', 1);
+        qInfo().noquote() << "     客户端: 累计收到字节 =" << window.client()->streamBytes()
+                          << " 解析出帧数 =" << window.client()->streamFrameCount();
+        reportServerSide = true;
+        window.client()->fetchCameras();       // 异步，结果在下一次事件循环打印
+
+        if (!picture) {
+            qCritical().noquote() << "[FAIL] 没有收到任何画面";
+            finish(1);
+            return;
+        }
+        if (fps < 10.0) {
+            qCritical().noquote() << "[FAIL] 帧数过少，推流可能不正常";
+            finish(1);
+            return;
+        }
+
+        // 关闭视频源，确认能干净收尾
+        window.client()->closeCamera(live->currentCameraId());
+        QTimer::singleShot(2500, [&]() {
+            qInfo().noquote() << "[OK] 关闭后 推流中=" << live->isStreaming();
+            finish(0);
+        });
+    });
+
+    QTimer::singleShot((seconds + 20) * 1000, [&]() {
+        qCritical().noquote() << "[FAIL] 超时";
+        finish(1);
+    });
+
+    loop.exec();
+    return exitCode;
+}
 int runHistorySmokeTest()
 {
     fmd::MainWindow window;
@@ -911,9 +1047,9 @@ int runScreenshot(const QString &path, int page, int waitMs)
 
     pause(1800);
 
-    if (page == 1 && window.batchView())
+    if (page == 2 && window.batchView())          // 2 = 批量检测
         window.batchView()->selectRow(0);
-    else if (page == 2 && window.historyView())
+    else if (page == 3 && window.historyView())   // 3 = 历史记录
         window.historyView()->selectFirstRow();
 
     pause(2800);   // 等原图从服务端拉回并解码
@@ -1061,6 +1197,21 @@ int main(int argc, char *argv[])
 
     if (args.contains(QStringLiteral("--smoke-llm")))
         return runLlmSmokeTest();
+
+    const int liveIdx = args.indexOf(QStringLiteral("--smoke-live"));
+    if (liveIdx >= 0) {
+        QString source;
+        int seconds = 12;
+        if (liveIdx + 1 < args.size() && !args.at(liveIdx + 1).startsWith(QLatin1String("--")))
+            source = args.at(liveIdx + 1);
+        if (liveIdx + 2 < args.size())
+            seconds = qMax(3, args.at(liveIdx + 2).toInt());
+        if (source.isEmpty()) {
+            qCritical().noquote() << "用法: fmd_client --smoke-live <视频源> [秒数]";
+            return 2;
+        }
+        return runLiveSmokeTest(source, seconds);
+    }
 
     const int benchIdx = args.indexOf(QStringLiteral("--benchmark"));
     if (benchIdx >= 0) {

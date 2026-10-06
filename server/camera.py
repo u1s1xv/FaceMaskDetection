@@ -62,7 +62,11 @@ class FrameSlot:
     """
 
     def __init__(self):
+        # 用 Condition 而不是裸 Lock：读方可以"等新帧"而不是空转轮询。
+        # 轮询会带来 GIL 争用 —— 推流线程每秒唤醒 250 次抢锁，
+        # 和推理线程互相拖累（实测把双方的帧率都压低了）。
         self._lock = threading.Lock()
+        self._cond = threading.Condition(self._lock)
         self._seq = 0
         self._data = None
         self._ts = 0.0
@@ -70,12 +74,13 @@ class FrameSlot:
         self._dropped = 0
 
     def put(self, data):
-        with self._lock:
+        with self._cond:
             if self._seq > self._consumed_seq and self._data is not None:
                 self._dropped += 1        # 上一帧还没被读走就被覆盖了
             self._seq += 1
             self._data = data
             self._ts = time.time()
+            self._cond.notify_all()       # 叫醒等新帧的推流线程
             return self._seq
 
     def get(self):
@@ -94,8 +99,22 @@ class FrameSlot:
             return self._seq, self._data, self._ts
 
     def peek(self):
-        """看一眼最新帧但不标记为已消费（推流用：没有新帧时也要重发上一帧）。"""
+        """看一眼最新帧但不标记为已消费（推流用）。"""
         with self._lock:
+            return self._seq, self._data, self._ts
+
+    def wait_newer(self, since_seq, timeout=1.0):
+        """阻塞直到出现比 since_seq 更新的帧，或超时。
+
+        返回 (seq, data, ts)。超时且没有新帧时 seq 仍等于 since_seq。
+        用它替代"睡几毫秒再看一眼"的轮询：不空转、不抢 GIL、延迟更低。
+        """
+        with self._cond:
+            # 两条都要判：既没有更新的帧，也还没有任何帧时，都应该等待。
+            # 只判前者的话，调用方传入一个小于初始 seq 的值（比如 -1）就会立即返回，
+            # 变成忙等待。
+            if self._data is None or self._seq <= since_seq:
+                self._cond.wait(timeout)
             return self._seq, self._data, self._ts
 
     @property
@@ -127,30 +146,45 @@ def list_devices(max_index=4):
 
     OpenCV 没有可靠的设备枚举接口，只能逐个序号试探。打开设备有开销，
     所以限制扫描范围 —— 上位机现场不会有几十个摄像头。
+
+    **每个序号独立兜底**：某台设备被别的进程占用、或驱动抛异常时，
+    不能让它把整个枚举带崩。枚举失败会让 /cameras 返回 500，
+    而那个端点还承载着推流状态 —— 代价远大于"少列出一个摄像头"。
     """
     found = []
     for idx in range(max_index):
-        cap = None
-        for name, api in DEVICE_BACKENDS:
-            try:
-                cap = cv2.VideoCapture(idx, api)
-                if cap.isOpened() and cap.read()[0]:
-                    found.append({
-                        "index": idx,
-                        "backend": name,
-                        "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-                        "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-                    })
-                    break
-                cap.release()
-                cap = None
-            except Exception:                      # noqa: BLE001
-                if cap is not None:
-                    cap.release()
-                cap = None
-        if cap is not None:
-            cap.release()
+        try:
+            probe = _probe_device(idx)
+        except Exception as exc:                   # noqa: BLE001
+            logger.warning("枚举摄像头 %d 失败（已跳过）: %s", idx, exc)
+            continue
+        if probe is not None:
+            found.append(probe)
     return found
+
+
+def _probe_device(idx):
+    """试探单个序号；可用则返回设备信息，否则返回 None。"""
+    for name, api in DEVICE_BACKENDS:
+        cap = None
+        try:
+            cap = cv2.VideoCapture(idx, api)
+            if cap.isOpened() and cap.read()[0]:
+                return {
+                    "index": idx,
+                    "backend": name,
+                    "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                    "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                }
+        except Exception:                          # noqa: BLE001
+            pass
+        finally:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:                  # noqa: BLE001
+                    pass
+    return None
 
 
 class CameraSource:
@@ -398,6 +432,7 @@ class CameraManager:
         self._counter = 0
         self._devices_cache = None
         self._devices_at = 0.0
+        self._devices_ttl = 30.0
 
     def open(self, source, width=640, height=480, backend=None, name=None):
         """打开一个视频源，返回 (cam_id, source)。失败时抛 RuntimeError。"""
@@ -463,20 +498,36 @@ class CameraManager:
             out.append(entry)
         return out
 
-    def list_devices_cached(self, ttl=30.0):
+    def list_devices_cached(self, ttl=30.0, error_ttl=10.0):
         """枚举本机摄像头，结果缓存若干秒。
 
         枚举要逐个序号试打开设备，一次好几秒。界面上刷新列表不该等这么久，
         所以缓存。
+
+        **失败也要缓存**（用更短的 TTL）。这不是优化，是修 bug：
+        只在成功时写缓存的话，一旦枚举抛异常（设备被别的进程占用、驱动报错），
+        缓存永远是空的 —— 而客户端每秒轮询一次，于是每次都重新枚举，
+        反复阻塞数秒并占住 GIL，把同进程的推理管线一起拖死。
+        实测表现是"推流跑着跑着突然掉到 2 FPS"。
         """
         now = time.time()
         with self._lock:
-            if self._devices_cache is not None and now - self._devices_at < ttl:
+            if (self._devices_cache is not None
+                    and now - self._devices_at < self._devices_ttl):
                 return self._devices_cache
-        devices = list_devices()
+
+        try:
+            devices = list_devices()
+            used_ttl = ttl
+        except Exception:                          # noqa: BLE001
+            logger.exception("枚举摄像头失败，缓存空结果以免每次轮询都重试")
+            devices = []
+            used_ttl = error_ttl
+
         with self._lock:
             self._devices_cache = devices
             self._devices_at = now
+            self._devices_ttl = used_ttl
         return devices
 
     def close_all(self):

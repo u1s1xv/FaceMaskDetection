@@ -14,9 +14,14 @@ find_package(Qt5 5.15 REQUIRED COMPONENTS Core Test)
 enable_testing()
 
 add_executable(fmd_tests
+    test_main.cpp
+    test_runner.h
     test_sseparser.cpp
+    test_mjpegparser.cpp
     ../src/core/SseParser.h
     ../src/core/SseParser.cpp
+    ../src/core/MjpegParser.h
+    ../src/core/MjpegParser.cpp
 )
 
 target_include_directories(fmd_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
@@ -48,7 +53,8 @@ if (WIN32)
     endif()
 endif()
 
-add_test(NAME sse_parser COMMAND fmd_tests)
+# 一个可执行文件里跑全部测试类（SseParser + MjpegParser + …）
+add_test(NAME unit_tests COMMAND fmd_tests)
 
 # Visual Studio 生成器是多配置的，ctest 需要知道测哪个配置
-set_tests_properties(sse_parser PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(unit_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

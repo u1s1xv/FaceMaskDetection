@@ -17,6 +17,7 @@ class BackendStatusView;
 class BatchView;
 class DetectView;
 class HistoryView;
+class LiveView;
 class ModelsView;
 class SettingsView;
 struct HealthInfo;
@@ -32,6 +33,7 @@ public:
     DetectView    *detectView() const { return m_detectView; }
     BatchView     *batchView() const { return m_batchView; }
     HistoryView   *historyView() const { return m_historyView; }
+    LiveView      *liveView() const { return m_liveView; }
     ModelsView    *modelsView() const { return m_modelsView; }
 
     // 供脚本化截图/自动化切换页面
@@ -60,6 +62,7 @@ private:
     DetectView        *m_detectView = nullptr;
     BatchView         *m_batchView  = nullptr;
     HistoryView       *m_historyView = nullptr;
+    LiveView          *m_liveView    = nullptr;
     ModelsView        *m_modelsView  = nullptr;
     SettingsView      *m_settingsView = nullptr;
 
