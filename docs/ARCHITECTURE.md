@@ -132,6 +132,43 @@ Windows 上这是必踩的坑：
 
 ---
 
+### 2.9 构建系统：为什么放弃 Ninja 改用 MSBuild
+
+一开始用 Ninja（快、跨平台），但在**中文区域的 MSVC** 下遇到一个隐蔽的正确性问题：
+
+Ninja 依赖 `build.ninja` 里的 `msvc_deps_prefix` 来识别 `cl.exe /showIncludes` 的输出行，
+据此建立头文件依赖。CMake 探测到中文前缀后，把它写进 `rules.ninja`：
+
+```
+msvc_deps_prefix = 娉ㄦ剰: 鍖呭惈鏂囦欢:      # 乱码
+```
+
+这是「`注意: 包含文件:` 的 UTF-8 字节被当成 GBK 再转一次」的典型乱码。编译器实际输出的是
+GBK 字节，两边对不上，**Ninja 把全部 include 行丢弃**。
+
+**后果非常隐蔽**：改头文件不触发任何 `.cpp` 重编，不同编译单元对同一个类的内存布局理解
+不一致。本项目中它依次表现为：
+
+| 症状 | 误判方向 |
+| --- | --- |
+| 程序启动即崩，`0xC0000374` 堆损坏，无任何输出 | 以为新代码有内存 bug |
+| `0xC0000005` 访问违例 | 以为对象生命周期有问题 |
+| `LNK2019` 找不到刚加的函数（明明有定义） | 以为宏/命名空间写错 |
+| `LNK2019` 找不到 `setEmptyHint` | 反复检查声明与定义 |
+
+**诊断方法**（不要猜）：
+
+1. `Select-String -Path build\build.ninja -Pattern msvc_deps_prefix` 看前缀是什么
+2. 对比 `.obj` 与 `.h` 的时间戳 —— 头文件更新但 obj 没变，就是依赖追踪失效
+3. 用 `cl /showIncludes` 手工编译一个小文件，确认编译器输出的实际编码
+
+**修法**：改用 `-G "Visual Studio 17 2022"`。MSBuild 由编译器自身解析 `/showIncludes`，
+不经过 Ninja 的前缀字符串匹配，不受区域设置影响。代价是构建略慢、产物路径变成多配置形式
+（本项目用 `CMAKE_RUNTIME_OUTPUT_DIRECTORY` 固定在 `build/bin/` 规避）。
+
+> **教训**：这类问题不该靠"每次改头文件就 clean build"绕过。
+> 增量构建不可靠本身就是缺陷 —— 它会持续制造假的 bug 信号，浪费的时间远超修它的成本。
+
 ### 2.9 部署：为什么构建产物必须自带 Qt 运行时
 
 这不是"锦上添花的打包步骤"，而是**让程序能跑起来的必要条件**。
@@ -189,6 +226,8 @@ BatchController 调度器
 | **Qt5 高 DPI 不生效** | 界面模糊 | Qt5 必须手动设 ``AA_EnableHighDpiScaling``，且要在 QApplication 构造**之前**（Qt6 才自动） |
 | **运行时加载到错误的 Qt**（最严重） | 双击 exe 弹「无法定位程序输入点 ?viewportSizeHint@QTableView@@...」 | exe 链接的是 D:\Qt 的 MSVC 版 Qt，但本机 PATH 上有 D:\Qt\5.15.2\mingw81_64\bin（**MinGW 版**，ABI 不兼容）。Windows 的 DLL 搜索顺序是「exe 目录 > 系统目录 > PATH」，而 build 目录里没有 Qt DLL，于是沿 PATH 抓到了 MinGW 那套。**修法：构建后用 windeployqt 把 Qt 运行时拷到 exe 旁边**。见 2.9 |
 | **用 CopyFromScreen 截图会误判布局** | 截图里右侧面板"不见了" | 做截图的 PowerShell 进程是 DPI-unaware 的，在 200% 缩放屏上拿到的是被虚拟化缩放的桌面。**修法：用 QWidget::grab() 让 Qt 自己渲染**（--screenshot 模式），或先看控件几何数据（--dump-layout）再下结论 |
+| **普通 QWidget 设了 QSS 背景却不显示** | 统计卡片看着是"没有卡片" | QWidget 子类默认不绘制样式表的 background/border，必须 `setAttribute(Qt::WA_StyledBackground, true)` |
+| **改头文件不触发重编**（最耗时） | 启动崩溃 / LNK2019，反复出现 | Ninja 在中文区域 MSVC 下 `msvc_deps_prefix` 编码错乱，依赖追踪整体失效。见 2.9 |
 
 ---
 

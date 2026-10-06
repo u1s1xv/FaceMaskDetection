@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(FaceMaskClientTests LANGUAGES CXX)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY         ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG   ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -45,3 +49,6 @@ if (WIN32)
 endif()
 
 add_test(NAME sse_parser COMMAND fmd_tests)
+
+# Visual Studio 生成器是多配置的，ctest 需要知道测哪个配置
+set_tests_properties(sse_parser PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

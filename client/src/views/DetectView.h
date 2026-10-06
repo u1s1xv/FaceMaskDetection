@@ -22,6 +22,7 @@ namespace fmd {
 
 class BackendClient;
 class ImageCanvas;
+class StatCard;
 
 class DetectView : public QWidget
 {
@@ -73,9 +74,9 @@ private:
     QProgressBar   *m_progress     = nullptr;
 
     QLabel      *m_fileLabel    = nullptr;
-    QLabel      *m_countWith    = nullptr;
-    QLabel      *m_countWithout = nullptr;
-    QLabel      *m_countWrong   = nullptr;
+    StatCard    *m_cardWith    = nullptr;
+    StatCard    *m_cardWithout = nullptr;
+    StatCard    *m_cardWrong   = nullptr;
     QLabel      *m_totalLabel   = nullptr;
     QLabel      *m_timeLabel    = nullptr;
     QListWidget *m_detectionList = nullptr;

@@ -1,5 +1,7 @@
 #include "ModelsView.h"
 
+#include "widgets/PageHeader.h"
+
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -23,8 +25,17 @@ ModelsView::ModelsView(QWidget *parent)
 
 void ModelsView::buildUi()
 {
-    auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(8, 8, 8, 8);
+    auto *outer = new QVBoxLayout(this);
+    outer->setContentsMargins(12, 12, 12, 12);
+    outer->setSpacing(10);
+
+    outer->addWidget(new PageHeader(
+        tr("模型管理"),
+        tr("扫描 yoloserver/models/checkpoints/ 下的权重文件。把训练好的 .pt 放进去后点「重新扫描」即可出现。")));
+
+    auto *root = new QVBoxLayout;
+    root->setSpacing(8);
+    outer->addLayout(root, 1);
 
     auto *header = new QGroupBox(tr("当前默认模型"), this);
     auto *headerLayout = new QHBoxLayout(header);

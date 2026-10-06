@@ -4,6 +4,7 @@
 
 #include <QGraphicsPixmapItem>
 #include <QGraphicsScene>
+#include <QFont>
 #include <QPainter>
 #include <QResizeEvent>
 #include <QWheelEvent>
@@ -114,6 +115,37 @@ void ImageCanvas::drawBackground(QPainter *painter, const QRectF &rect)
 {
     // 深色背景，放图片和框对比度更好
     painter->fillRect(rect, QColor(38, 40, 44));
+}
+
+void ImageCanvas::setEmptyHint(const QString &title, const QString &detail)
+{
+    m_emptyTitle  = title;
+    m_emptyDetail = detail;
+    viewport()->update();
+}
+
+void ImageCanvas::drawForeground(QPainter *painter, const QRectF &rect)
+{
+    QGraphicsView::drawForeground(painter, rect);
+    if (hasImage() || m_emptyTitle.isEmpty())
+        return;
+
+    // 用视口对应的场景矩形定位，保证文案始终居中且不随缩放漂移
+    const QRectF viewRect = mapToScene(viewport()->rect()).boundingRect();
+
+    QFont titleFont = painter->font();
+    titleFont.setPointSizeF(13.0);
+    painter->setFont(titleFont);
+    painter->setPen(QColor(152, 160, 170));
+    painter->drawText(viewRect.adjusted(0, -18, 0, -18), Qt::AlignCenter, m_emptyTitle);
+
+    if (!m_emptyDetail.isEmpty()) {
+        QFont detailFont = painter->font();
+        detailFont.setPointSizeF(10.5);
+        painter->setFont(detailFont);
+        painter->setPen(QColor(108, 116, 126));
+        painter->drawText(viewRect.adjusted(0, 16, 0, 16), Qt::AlignCenter, m_emptyDetail);
+    }
 }
 
 } // namespace fmd

@@ -1,7 +1,10 @@
 #include "BatchView.h"
 
+#include "ImageCanvas.h"
+#include "widgets/PageHeader.h"
 #include "core/BackendClient.h"
 #include "workers/BatchController.h"
+#include "workers/ImageLoaderTask.h"
 
 #include <QComboBox>
 #include <QDir>
@@ -14,9 +17,12 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QProgressBar>
+#include <QListWidget>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QSplitter>
 #include <QTableWidget>
+#include <QThreadPool>
 #include <QVBoxLayout>
 
 namespace fmd {
@@ -34,7 +40,9 @@ BatchView::BatchView(BackendClient *client, QWidget *parent)
     : QWidget(parent)
     , m_client(client)
     , m_controller(new BatchController(client, this))
+    , m_pool(new QThreadPool(this))
 {
+    m_pool->setMaxThreadCount(qMax(2, QThread::idealThreadCount() - 1));
     buildUi();
 
     connect(m_controller, &BatchController::jobFinished,    this, &BatchView::onJobFinished);
@@ -46,8 +54,17 @@ BatchView::BatchView(BackendClient *client, QWidget *parent)
 
 void BatchView::buildUi()
 {
-    auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(8, 8, 8, 8);
+    auto *outer = new QVBoxLayout(this);
+    outer->setContentsMargins(12, 12, 12, 12);
+    outer->setSpacing(10);
+
+    outer->addWidget(new PageHeader(
+        tr("批量检测"),
+        tr("一次添加多张图片或整个文件夹，客户端按设定并发数排队调度，服务端串行推理。\n双击结果表中的任意一行可跳转到单图页查看原图。")));
+
+    auto *root = new QVBoxLayout;
+    root->setSpacing(8);
+    outer->addLayout(root, 1);
 
     // ---------------- 参数区 ----------------
     auto *paramBox = new QGroupBox(tr("批量参数"), this);
@@ -111,9 +128,12 @@ void BatchView::buildUi()
     root->addLayout(actionRow);
 
     m_progress = new QProgressBar(this);
-    m_progress->setRange(0, 100);
+    // 还没有文件时不应该显示 "0 / 100" 这种无意义的总量
+    m_progress->setRange(0, 1);
     m_progress->setValue(0);
     m_progress->setFormat(QStringLiteral("%v / %m"));
+    m_progress->setEnabled(false);
+    m_progress->setVisible(false);   // 没有任务时不占位
     root->addWidget(m_progress);
 
     m_summary = new QLabel(tr("尚未添加文件"), this);
@@ -132,7 +152,38 @@ void BatchView::buildUi()
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_table->setAlternatingRowColors(true);
     m_table->verticalHeader()->setVisible(false);
-    root->addWidget(m_table, 1);
+
+    // ---------------- 右侧：选中行的结果预览 ----------------
+    // 批量请求为了省带宽不返回标注图，所以预览是"本地原图 + 服务端检测框"客户端重绘，
+    // 与单图页、历史页用的是同一套 ImageCanvas。
+    auto *previewBox = new QWidget(this);
+    auto *previewLayout = new QVBoxLayout(previewBox);
+    previewLayout->setContentsMargins(0, 0, 0, 0);
+
+    m_previewInfo = new QLabel(tr("选中左侧任意一行，查看该图片的检测结果"), previewBox);
+    m_previewInfo->setWordWrap(true);
+    m_previewInfo->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    previewLayout->addWidget(m_previewInfo);
+
+    m_preview = new ImageCanvas(previewBox);
+    m_preview->setMinimumWidth(320);
+    previewLayout->addWidget(m_preview, 1);
+
+    m_previewList = new QListWidget(previewBox);
+    m_previewList->setMaximumHeight(150);
+    m_previewList->setAlternatingRowColors(true);
+    previewLayout->addWidget(m_previewList);
+
+    m_splitter = new QSplitter(Qt::Horizontal, this);
+    m_splitter->addWidget(m_table);
+    m_splitter->addWidget(previewBox);
+    // 表格要放 7 列，优先给它空间；预览给一个感知上够用的固定区间即可
+    m_splitter->setStretchFactor(0, 1);
+    m_splitter->setStretchFactor(1, 0);
+    m_splitter->setCollapsible(0, false);
+    previewBox->setMinimumWidth(300);
+    previewBox->setMaximumWidth(430);
+    root->addWidget(m_splitter, 1);
 
     // ---------------- 连接 ----------------
     connect(m_addFilesButton,  &QPushButton::clicked, this, &BatchView::addFiles);
@@ -141,6 +192,7 @@ void BatchView::buildUi()
     connect(m_cancelButton,    &QPushButton::clicked, this, &BatchView::cancelBatch);
     connect(m_clearButton,     &QPushButton::clicked, this, &BatchView::clearList);
     connect(m_table, &QTableWidget::cellDoubleClicked, this, &BatchView::openRowInDetectPage);
+    connect(m_table, &QTableWidget::itemSelectionChanged, this, &BatchView::onSelectionChanged);
 }
 
 void BatchView::setModels(const QVector<ModelInfo> &models)
@@ -206,7 +258,8 @@ void BatchView::appendRows(const QStringList &paths)
     }
 
     m_summary->setText(tr("已添加 %1 个文件（双击某行可在单图页查看）").arg(all.size()));
-    m_progress->setRange(0, all.size());
+    m_progress->setVisible(!all.isEmpty());
+    m_progress->setRange(0, qMax(1, all.size()));
     m_progress->setValue(0);
     updateButtons();
 }
@@ -249,7 +302,8 @@ void BatchView::startBatch()
             m_table->item(row, col)->setText(QStringLiteral("—"));
     }
 
-    m_progress->setRange(0, m_controller->totalCount());
+    m_progress->setVisible(true);
+    m_progress->setRange(0, qMax(1, m_controller->totalCount()));
     m_progress->setValue(0);
     m_controller->start();
     updateButtons();
@@ -269,9 +323,18 @@ void BatchView::cancelBatch()
 void BatchView::clearList()
 {
     m_controller->clear();
+    m_results.clear();
+    m_previewPath.clear();
+    if (m_preview) {
+        m_preview->clearAll();
+        m_previewList->clear();
+        m_previewInfo->setText(tr("选中左侧任意一行，查看该图片的检测结果"));
+    }
     m_table->setRowCount(0);
-    m_progress->setRange(0, 100);
+    m_progress->setRange(0, 1);
     m_progress->setValue(0);
+    m_progress->setEnabled(false);
+    m_progress->setVisible(false);
     m_summary->setText(tr("尚未添加文件"));
     updateButtons();
 }
@@ -288,6 +351,13 @@ void BatchView::updateButtons()
 
 void BatchView::onJobFinished(const QString &filePath, const DetectionResult &result)
 {
+    // 存下结果供预览使用：批量模式下服务端不返回标注图，只回结构化数据
+    RowResult stored;
+    stored.ok         = true;
+    stored.recordId   = result.recordId;
+    stored.detections = result.detections;
+    m_results.insert(filePath, stored);
+
     const int row = rowOf(filePath);
     if (row < 0)
         return;
@@ -343,6 +413,95 @@ void BatchView::openRowInDetectPage(int row, int)
     QTableWidgetItem *item = m_table->item(row, ColFile);
     if (item)
         emit requestOpenImage(item->data(Qt::UserRole).toString());
+}
+
+void BatchView::selectRow(int row)
+{
+    if (row >= 0 && row < m_table->rowCount())
+        m_table->selectRow(row);
+}
+
+bool BatchView::previewHasImage() const
+{
+    return m_preview && m_preview->hasImage();
+}
+
+int BatchView::previewDetectionCount() const
+{
+    return m_preview ? m_preview->detectionCount() : 0;
+}
+
+void BatchView::onSelectionChanged()
+{
+    showPreviewForRow(m_table->currentRow());
+}
+
+void BatchView::showPreviewForRow(int row)
+{
+    if (row < 0 || !m_table->item(row, ColFile)) {
+        m_previewPath.clear();
+        m_preview->clearAll();
+        m_previewList->clear();
+        m_previewInfo->setText(tr("选中左侧任意一行，查看该图片的检测结果"));
+        return;
+    }
+
+    const QString filePath = m_table->item(row, ColFile)->data(Qt::UserRole).toString();
+    m_previewPath = filePath;
+
+    const auto it = m_results.constFind(filePath);
+    if (it == m_results.constEnd() || !it->ok) {
+        m_preview->clearAll();
+        m_previewList->clear();
+        m_previewInfo->setText(tr("%1\n\n该图片还没有检测结果（未处理或已失败）")
+                                   .arg(QFileInfo(filePath).fileName()));
+        return;
+    }
+
+    // 结果明细
+    m_previewList->clear();
+    for (const Detection &d : it->detections) {
+        m_previewList->addItem(tr("#%1  %2  置信度 %3  框(%4,%5)-(%6,%7)")
+                                   .arg(d.classId)
+                                   .arg(d.className)
+                                   .arg(d.confidence, 0, 'f', 3)
+                                   .arg(d.x1, 0, 'f', 0).arg(d.y1, 0, 'f', 0)
+                                   .arg(d.x2, 0, 'f', 0).arg(d.y2, 0, 'f', 0));
+    }
+    if (it->detections.isEmpty())
+        m_previewList->addItem(tr("（未检测到目标）"));
+
+    m_previewInfo->setText(tr("%1 ｜ 共 %2 个目标 ｜ 记录 #%3")
+                               .arg(QFileInfo(filePath).fileName())
+                               .arg(it->detections.size())
+                               .arg(it->recordId));
+
+    // 图片解码放到线程池，避免大图卡住界面；与单图页用的是同一个任务类
+    auto *task = new ImageLoaderTask(filePath, /*decodeImage=*/true);
+    connect(task, &ImageLoaderTask::loaded, this, &BatchView::onPreviewLoaded);
+    connect(task, &ImageLoaderTask::failed, this, &BatchView::onPreviewFailed);
+    m_pool->start(task);
+}
+
+void BatchView::onPreviewLoaded(const QString &filePath, const QImage &image,
+                                const QByteArray &, qint64)
+{
+    if (filePath != m_previewPath)
+        return;              // 用户已切到别的行，丢弃过期结果
+
+    m_preview->setImage(image);
+
+    const auto it = m_results.constFind(filePath);
+    if (it != m_results.constEnd())
+        m_preview->setDetections(it->detections);
+}
+
+void BatchView::onPreviewFailed(const QString &filePath, const QString &error)
+{
+    if (filePath != m_previewPath)
+        return;
+    m_preview->clearAll();
+    m_previewInfo->setText(tr("无法加载预览：%1").arg(error));
 }
 
 } // namespace fmd

@@ -1,9 +1,10 @@
 @echo off
 rem FaceMaskDetection 客户端打包脚本
 rem
-rem 关键点：必须把 D:\Qt 的 bin 放在 PATH 最前面。
-rem 本机 PATH 上的 qmake/Qt5*.dll 是 Anaconda 自带的另一套 Qt，
-rem windeployqt 按 PATH 找依赖，会误抓 Anaconda 的 DLL 导致打包失败或运行崩溃。
+rem 关键点一：必须把 D:\Qt 的 bin 放在 PATH 最前面。
+rem   本机 PATH 上的 qmake/Qt5*.dll 是 Anaconda 或 MinGW 自带的另一套 Qt，
+rem   windeployqt 按 PATH 找依赖，会误抓它们导致打包失败或运行崩溃。
+rem 关键点二：用 Visual Studio 生成器，原因见 build.bat 顶部说明。
 setlocal
 
 set "QT_DIR=D:\Qt\5.15.2\msvc2019_64"
@@ -16,20 +17,20 @@ call "%VCVARS%" >nul 2>&1 || ( echo [ERROR] vcvars64 failed & exit /b 1 )
 cd /d "%~dp0"
 
 echo [1/3] 构建 release...
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%QT_DIR%" || exit /b 1
-cmake --build build || exit /b 1
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="%QT_DIR%" || exit /b 1
+cmake --build build --config Release || exit /b 1
 
 echo [2/3] 收集运行时依赖...
 if exist dist rmdir /s /q dist
 mkdir dist
-copy /y build\fmd_client.exe dist\ >nul || exit /b 1
+copy /y build\bin\fmd_client.exe dist\ >nul || exit /b 1
 windeployqt --release --no-translations --no-compiler-runtime --no-opengl-sw dist\fmd_client.exe || exit /b 1
 
 rem 翻译文件：运行时从可执行文件同级的 i18n\ 加载，必须一起拷过去
-if exist build\i18n (
-  xcopy /y /i /q build\i18n dist\i18n\ >nul || exit /b 1
+if exist build\bin\i18n (
+  xcopy /y /i /q build\bin\i18n dist\i18n\ >nul || exit /b 1
 ) else (
-  echo [WARN] 未找到 build\i18n，打包版将没有英文界面
+  echo [WARN] 未找到 build\bin\i18n，打包版将没有英文界面
 )
 rem 无头验证用的平台插件（正式交付可不带；带上不影响）
 if exist "%QT_DIR%\plugins\platforms\qoffscreen.dll" copy /y "%QT_DIR%\plugins\platforms\qoffscreen.dll" dist\platforms\ >nul

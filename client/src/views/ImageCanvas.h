@@ -25,10 +25,15 @@ public:
     void fitToWindow();
 
     bool hasImage() const;
+    int  detectionCount() const { return m_detectionItems.size(); }
+
+    // 没有图片时画在画面正中的引导文案（比挂在底部角落显眼得多）
+    void setEmptyHint(const QString &title, const QString &detail = QString());
 
 protected:
     void wheelEvent(QWheelEvent *event) override;
     void drawBackground(QPainter *painter, const QRectF &rect) override;
+    void drawForeground(QPainter *painter, const QRectF &rect) override;
     void resizeEvent(QResizeEvent *event) override;
 
 private:
@@ -39,6 +44,8 @@ private:
     QVector<QGraphicsItem *> m_detectionItems;
     double m_zoom = 1.0;
     bool   m_fitOnNextResize = false;
+    QString m_emptyTitle;
+    QString m_emptyDetail;
 };
 
 } // namespace fmd

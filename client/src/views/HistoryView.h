@@ -30,6 +30,11 @@ public:
     int visibleRowCount() const;
     int loadedRowCount() const;
 
+    // 详情面板状态（自动化验证用）
+    bool detailHasImage() const;
+    int  detailDetectionCount() const;
+    void selectFirstRow();
+
 public slots:
     void refresh();
 
@@ -64,6 +69,11 @@ private:
     ImageCanvas *m_canvas   = nullptr;
     QLabel      *m_detail   = nullptr;
     int          m_loadedImageId = -1;
+
+    // 详情接口返回的检测框。
+    // 注意：列表接口 /history 只返回摘要，不含 detections，
+    // 所以画框必须用这里存的详情数据，不能用模型里的记录。
+    QVector<fmd::Detection> m_currentDetections;
 };
 
 } // namespace fmd

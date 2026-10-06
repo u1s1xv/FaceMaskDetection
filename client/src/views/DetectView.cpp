@@ -2,6 +2,8 @@
 
 #include "ImageCanvas.h"
 #include "LlmAnalysisDialog.h"
+#include "widgets/PageHeader.h"
+#include "widgets/StatCard.h"
 #include "core/BackendClient.h"
 #include "workers/ImageLoaderTask.h"
 
@@ -56,8 +58,17 @@ DetectView::DetectView(BackendClient *client, QWidget *parent)
 
 void DetectView::buildUi()
 {
-    auto *root = new QHBoxLayout(this);
-    root->setContentsMargins(8, 8, 8, 8);
+    auto *outer = new QVBoxLayout(this);
+    outer->setContentsMargins(12, 12, 12, 12);
+    outer->setSpacing(10);
+
+    outer->addWidget(new PageHeader(
+        tr("单图检测"),
+        tr("拖入或打开一张图片，调用本地推理服务检测口罩佩戴情况。每次检测都会自动存入历史记录。")));
+
+    auto *root = new QHBoxLayout;
+    root->setSpacing(10);
+    outer->addLayout(root, 1);
 
     // ---------------- 左侧：画布 ----------------
     auto *canvasBox = new QGroupBox(tr("图像"), this);
@@ -66,9 +77,14 @@ void DetectView::buildUi()
     m_canvas = new ImageCanvas(canvasBox);
     canvasLayout->addWidget(m_canvas, 1);
 
-    m_hint = new QLabel(tr("把图片拖到这里，或点击「打开图片」"), canvasBox);
+    // 引导文案直接画在画布中央（见 ImageCanvas::drawForeground），
+    // 底部这个小标签只用来显示文件名/耗时等动态信息
+    m_canvas->setEmptyHint(tr("把图片拖到这里，或点击右侧「打开图片」"),
+                           tr("支持 JPG / PNG / BMP / WebP"));
+
+    m_hint = new QLabel(QString(), canvasBox);
     m_hint->setAlignment(Qt::AlignCenter);
-    m_hint->setStyleSheet(QStringLiteral("color: #999; padding: 4px;"));
+    m_hint->setStyleSheet(QStringLiteral("color: #8a94a0; font-size: 12px; padding: 4px;"));
     canvasLayout->addWidget(m_hint);
 
     root->addWidget(canvasBox, 1);
@@ -140,29 +156,23 @@ void DetectView::buildUi()
     m_fileLabel->setStyleSheet(QStringLiteral("color: #666;"));
     resultLayout->addWidget(m_fileLabel);
 
-    auto *countForm = new QFormLayout;
-    m_countWith    = new QLabel(QStringLiteral("0"), resultBox);
-    m_countWithout = new QLabel(QStringLiteral("0"), resultBox);
-    m_countWrong   = new QLabel(QStringLiteral("0"), resultBox);
-    m_totalLabel   = new QLabel(QStringLiteral("0"), resultBox);
-    m_timeLabel    = new QLabel(QStringLiteral("—"), resultBox);
+    // 三个类别用卡片突出，比"标签: 数字"的表单行更容易一眼扫到
+    auto *cardRow = new QHBoxLayout;
+    cardRow->setSpacing(8);
+    m_cardWith    = new StatCard(tr("正确佩戴"),  QColor(26, 127, 55),  resultBox);
+    m_cardWithout = new StatCard(tr("未佩戴"),    QColor(198, 40, 40),  resultBox);
+    m_cardWrong   = new StatCard(tr("佩戴不规范"), QColor(184, 134, 11), resultBox);
+    cardRow->addWidget(m_cardWith);
+    cardRow->addWidget(m_cardWithout);
+    cardRow->addWidget(m_cardWrong);
+    resultLayout->addLayout(cardRow);
 
-    for (QLabel *lbl : { m_countWith, m_countWithout, m_countWrong, m_totalLabel }) {
-        QFont f = lbl->font();
-        f.setBold(true);
-        f.setPointSize(f.pointSize() + 3);
-        lbl->setFont(f);
-    }
-    m_countWith->setStyleSheet(QStringLiteral("color: #0a8f4d;"));
-    m_countWithout->setStyleSheet(QStringLiteral("color: #c62828;"));
-    m_countWrong->setStyleSheet(QStringLiteral("color: #b8860b;"));
-
-    countForm->addRow(tr("正确佩戴"), m_countWith);
-    countForm->addRow(tr("未佩戴"),   m_countWithout);
-    countForm->addRow(tr("佩戴不规范"), m_countWrong);
-    countForm->addRow(tr("目标总数"),  m_totalLabel);
-    countForm->addRow(tr("处理耗时"),  m_timeLabel);
-    resultLayout->addLayout(countForm);
+    auto *summaryForm = new QFormLayout;
+    m_totalLabel = new QLabel(QStringLiteral("0"), resultBox);
+    m_timeLabel  = new QLabel(QStringLiteral("—"), resultBox);
+    summaryForm->addRow(tr("目标总数"), m_totalLabel);
+    summaryForm->addRow(tr("处理耗时"), m_timeLabel);
+    resultLayout->addLayout(summaryForm);
 
     m_llmButton = new QPushButton(tr("AI 智能分析…"), resultBox);
     m_llmButton->setEnabled(false);
@@ -350,9 +360,9 @@ void DetectView::openLlmAnalysis()
 void DetectView::showResultSummary(const DetectionResult &result)
 {
     m_llmButton->setEnabled(result.recordId > 0);
-    m_countWith->setText(QString::number(result.counts.value(QStringLiteral("with_mask"))));
-    m_countWithout->setText(QString::number(result.counts.value(QStringLiteral("without_mask"))));
-    m_countWrong->setText(QString::number(result.counts.value(QStringLiteral("mask_weared_incorrect"))));
+    m_cardWith->setValue(result.counts.value(QStringLiteral("with_mask")));
+    m_cardWithout->setValue(result.counts.value(QStringLiteral("without_mask")));
+    m_cardWrong->setValue(result.counts.value(QStringLiteral("mask_weared_incorrect")));
     m_totalLabel->setText(QString::number(result.totalDetections));
     m_timeLabel->setText(QStringLiteral("%1 s").arg(result.processingTime, 0, 'f', 3));
 
@@ -371,9 +381,9 @@ void DetectView::resetResults()
 {
     m_canvas->clearAll();
     m_detectionList->clear();
-    m_countWith->setText(QStringLiteral("0"));
-    m_countWithout->setText(QStringLiteral("0"));
-    m_countWrong->setText(QStringLiteral("0"));
+    m_cardWith->reset();
+    m_cardWithout->reset();
+    m_cardWrong->reset();
     m_totalLabel->setText(QStringLiteral("0"));
     m_timeLabel->setText(QStringLiteral("—"));
     m_fileLabel->setText(QStringLiteral("—"));

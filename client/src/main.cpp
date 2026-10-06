@@ -350,7 +350,22 @@ int runBatchSmokeTest(const QString &imageDir, int limit)
                      [&](int succeeded, int failed, bool cancelled) {
         qInfo().noquote() << "[OK] 批量结束  成功=" << succeeded
                           << "失败=" << failed << "取消=" << cancelled;
-        finish(failed == 0 && succeeded == files.size() ? 0 : 1);
+        if (failed != 0 || succeeded != files.size()) {
+            finish(1);
+            return;
+        }
+
+        // 选中首行，验证预览面板能把该图片的检测框画出来
+        window.batchView()->selectRow(0);
+        QTimer::singleShot(2500, [&]() {
+            const bool hasImage = window.batchView()->previewHasImage();
+            const int  boxes    = window.batchView()->previewDetectionCount();
+            qInfo().noquote() << "[OK] 批量预览：图像已加载=" << hasImage
+                              << "检测框数=" << boxes;
+            if (!hasImage || boxes <= 0)
+                qCritical().noquote() << "[FAIL] 批量预览没有画出检测框";
+            finish(hasImage && boxes > 0 ? 0 : 1);
+        });
     });
 
     auto *connectPoll = new QTimer(&window);
@@ -453,7 +468,23 @@ int runHistorySmokeTest()
         QTimer::singleShot(1500, [&]() {
             const int visible = window.historyView()->visibleRowCount();
             qInfo().noquote() << "[OK] HistoryView 可见行数=" << visible;
-            finish(visible > 0 ? 0 : 1);
+            if (visible <= 0) {
+                finish(1);
+                return;
+            }
+
+            // 选中首行，验证详情面板真的把检测框画出来了
+            // （这里曾经有 bug：画框数据取自不含 detections 的列表接口，永远是空的）
+            window.historyView()->selectFirstRow();
+            QTimer::singleShot(2500, [&]() {
+                const bool hasImage = window.historyView()->detailHasImage();
+                const int  boxes    = window.historyView()->detailDetectionCount();
+                qInfo().noquote() << "[OK] 历史详情：图像已加载=" << hasImage
+                                  << "检测框数=" << boxes;
+                if (!hasImage || boxes <= 0)
+                    qCritical().noquote() << "[FAIL] 详情面板没有画出检测框";
+                finish(hasImage && boxes > 0 ? 0 : 1);
+            });
         });
     });
 
@@ -869,9 +900,23 @@ int runScreenshot(const QString &path, int page, int waitMs)
     loop.exec();
 
     window.switchToPage(page);
-    QEventLoop settle;
-    QTimer::singleShot(800, &settle, &QEventLoop::quit);
-    settle.exec();
+
+    // 分两步等：先等页面数据从服务端回来，再选行并等图片解码。
+    // 一上来就选行是没用的 —— 那时行数还是 0，选中请求会被丢弃。
+    auto pause = [](int ms) {
+        QEventLoop loop;
+        QTimer::singleShot(ms, &loop, &QEventLoop::quit);
+        loop.exec();
+    };
+
+    pause(1800);
+
+    if (page == 1 && window.batchView())
+        window.batchView()->selectRow(0);
+    else if (page == 2 && window.historyView())
+        window.historyView()->selectFirstRow();
+
+    pause(2800);   // 等原图从服务端拉回并解码
 
     const QPixmap shot = window.grab();
     if (shot.isNull() || !shot.save(path)) {

@@ -1,5 +1,7 @@
 #include "SettingsView.h"
 
+#include "widgets/PageHeader.h"
+
 #include "BackendStatusView.h"
 
 #include <QComboBox>
@@ -47,7 +49,12 @@ SettingsView::SettingsView(QWidget *parent)
 void SettingsView::buildUi()
 {
     auto *outer = new QVBoxLayout(this);
-    outer->setContentsMargins(0, 0, 0, 0);
+    outer->setContentsMargins(12, 12, 12, 12);
+    outer->setSpacing(10);
+
+    outer->addWidget(new PageHeader(
+        tr("设置"),
+        tr("配置推理服务的连接方式与默认推理参数。修改后点「保存」生效；改动端口或解释器时请用「保存并重启服务」。")));
 
     auto *scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
@@ -55,7 +62,8 @@ void SettingsView::buildUi()
 
     auto *content = new QWidget(scroll);
     auto *root = new QVBoxLayout(content);
-    root->setContentsMargins(8, 8, 8, 8);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(8);
 
     // ---------------- 连接配置 ----------------
     auto *connBox = new QGroupBox(tr("推理服务连接"), content);

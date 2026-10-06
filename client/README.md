@@ -25,8 +25,21 @@
 build.bat
 ```
 
-脚本会依次执行 `vcvars64` → `cmake 配置` → `ninja 构建` → **windeployqt 部署 Qt 运行时**，
-产物在 `build\fmd_client.exe`，**可以直接双击运行**（Qt DLL 已拷到旁边）。
+脚本会依次执行 `vcvars64` → `cmake 配置` → **MSBuild 构建** → **windeployqt 部署 Qt 运行时**，
+产物在 `build\bin\fmd_client.exe`，**可以直接双击运行**（Qt DLL 已拷到旁边）。
+
+### 为什么用 Visual Studio 生成器（MSBuild）而不是 Ninja
+
+这不是偏好问题，是**正确性**问题。Ninja 靠 `build.ninja` 里的 `msvc_deps_prefix` 识别编译器的
+头文件输出、进而生成依赖关系。CMake 会把该前缀写成 `注意: 包含文件:` 的 UTF-8 形式，
+而中文区域的 `cl.exe` 实际输出的是 GBK 字节 —— **两边对不上，Ninja 就把所有 include 行丢弃**。
+
+后果是：**改任何头文件都不会触发对应的 .cpp 重编**，不同编译单元对同一个类的内存布局
+理解不一致，表现为程序一启动就崩（`0xC0000374` 堆损坏 / `0xC0000005` 访问违例，且往往
+没有任何输出），或者链接期 `LNK2019` 找不到刚加的函数。
+
+MSBuild 由编译器自己解析 `/showIncludes`，不受编码影响。验证方法：改一个头文件后重新构建，
+对应的 `.obj` 时间戳必须更新。
 
 > 部署这一步不是可选的：本机 PATH 上有另一套（MinGW 版）Qt，
 > 如果 exe 旁边没有自己的 Qt DLL，运行时会加载到不兼容的那套而报错。详见「故障排查」。
@@ -34,7 +47,7 @@ build.bat
 ## 运行
 
 ```bat
-build\fmd_client.exe
+build\bin\fmd_client.exe
 ```
 
 客户端会自动用 `QProcess` 拉起 `../server/app.py`，轮询 `/health` 直到就绪。
@@ -82,6 +95,12 @@ run_tests.bat
 
 ## 故障排查
 
+### 改了头文件但程序行为没变 / 突然崩溃
+
+先执行 `build.bat clean` 做一次干净重建。若问题消失，说明是增量构建的依赖追踪出了问题 ——
+正常情况不该发生（见上文「为什么用 Visual Studio 生成器」），若反复出现请检查构建日志里
+是否还在用 Ninja。
+
 ### 弹窗「无法定位程序输入点 ?viewportSizeHint@QTableView@@...」
 
 **原因**：exe 链接的是 `D:\Qt\5.15.2\msvc2019_64`（MSVC 版），运行时却加载到了
@@ -96,11 +115,11 @@ PATH 上另一套 Qt —— 本机 PATH 里有 `D:\Qt\5.15.2\mingw81_64\bin`（*
 
 ```bat
 REM 1) build 目录里是否有 Qt5Core/Gui/Widgets/Network.dll 与 platforms\qwindows.dll
-dir build\Qt5*.dll
-dir build\platforms
+dir build\bin\Qt5*.dll
+dir build\bin\platforms
 
 REM 2) 这些 DLL 是否来自 D:\Qt（而不是别处）
-powershell -Command "Get-ChildItem build\Qt5*.dll | %% { $_.Name + ' ' + (Get-FileHash $_.FullName).Hash.Substring(0,8) }"
+powershell -Command "Get-ChildItem build\bin\Qt5*.dll | %% { $_.Name + ' ' + (Get-FileHash $_.FullName).Hash.Substring(0,8) }"
 
 REM 3) 重新执行完整构建（含部署步骤）
 build.bat
@@ -116,8 +135,8 @@ build.bat
 在高缩放屏幕上会拿到被虚拟化处理的画面。正确做法：
 
 ```bat
-build\fmd_client.exe --dump-layout          REM 看控件几何数据（权威）
-build\fmd_client.exe --screenshot ui.png 0  REM 用 Qt 自己渲染存图
+build\bin\fmd_client.exe --dump-layout          REM 看控件几何数据（权威）
+build\bin\fmd_client.exe --screenshot ui.png 0  REM 用 Qt 自己渲染存图
 ```
 
 ## 国际化

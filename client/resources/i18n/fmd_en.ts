@@ -53,6 +53,14 @@ Box (%3, %4) - (%5, %6)</translation>
         <source>[守护] 连续重启超过 5 次，停止自动重启</source>
         <translation>[guard] more than 5 consecutive restarts, giving up auto-restart</translation>
     </message>
+    <message>
+        <source>[守护] 服务进程已纳入作业对象，客户端退出时会一并终止</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>[守护] 警告：作业对象保护未生效，异常退出可能留下孤儿进程</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>fmd::BackendStatusView</name>
@@ -272,6 +280,41 @@ Error: %2</translation>
         <source>批量完成</source>
         <translation>Batch complete</translation>
     </message>
+    <message>
+        <source>选中左侧任意一行，查看该图片的检测结果</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1
+
+该图片还没有检测结果（未处理或已失败）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>#%1  %2  置信度 %3  框(%4,%5)-(%6,%7)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>（未检测到目标）</source>
+        <translation type="unfinished">(no objects detected)</translation>
+    </message>
+    <message>
+        <source>%1 ｜ 共 %2 个目标 ｜ 记录 #%3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>无法加载预览：%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>批量检测</source>
+        <translation type="unfinished">Batch</translation>
+    </message>
+    <message>
+        <source>一次添加多张图片或整个文件夹，客户端按设定并发数排队调度，服务端串行推理。
+双击结果表中的任意一行可跳转到单图页查看原图。</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>fmd::DetectView</name>
@@ -281,7 +324,7 @@ Error: %2</translation>
     </message>
     <message>
         <source>把图片拖到这里，或点击「打开图片」</source>
-        <translation>Drop an image here, or click &quot;Open Image&quot;</translation>
+        <translation type="vanished">Drop an image here, or click &quot;Open Image&quot;</translation>
     </message>
     <message>
         <source>推理参数</source>
@@ -433,6 +476,22 @@ Error: %2</translation>
         <source>推理请求失败：%1</source>
         <translation>Inference request failed: %1</translation>
     </message>
+    <message>
+        <source>单图检测</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>拖入或打开一张图片，调用本地推理服务检测口罩佩戴情况。每次检测都会自动存入历史记录。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>把图片拖到这里，或点击右侧「打开图片」</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>支持 JPG / PNG / BMP / WebP</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>fmd::HistoryModel</name>
@@ -540,6 +599,19 @@ Queued: %7 ms</translation>
     <message>
         <source>%1 失败：%2</source>
         <translation>%1 failed: %2</translation>
+    </message>
+    <message>
+        <source>正在加载记录 #%1 …</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>历史记录</source>
+        <translation type="unfinished">History</translation>
+    </message>
+    <message>
+        <source>每次检测都会自动入库。支持按文件名、时间、ID 搜索，也可以只看存在违规的记录。
+选中一行可在下方查看该次检测的标注结果。</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -749,6 +821,14 @@ Queued: %7 ms</translation>
         <source>默认模型已切换为 %1</source>
         <translation>Default model switched to %1</translation>
     </message>
+    <message>
+        <source>模型管理</source>
+        <translation type="unfinished">Models</translation>
+    </message>
+    <message>
+        <source>扫描 yoloserver/models/checkpoints/ 下的权重文件。把训练好的 .pt 放进去后点「重新扫描」即可出现。</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>fmd::SettingsView</name>
@@ -843,6 +923,14 @@ Queued: %7 ms</translation>
     </message>
     <message>
         <source>立即重启应用</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>设置</source>
+        <translation type="unfinished">Settings</translation>
+    </message>
+    <message>
+        <source>配置推理服务的连接方式与默认推理参数。修改后点「保存」生效；改动端口或解释器时请用「保存并重启服务」。</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

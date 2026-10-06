@@ -68,17 +68,24 @@ QString BackendProcess::resolveServerScript()
     if (!fromEnv.isEmpty() && QFileInfo::exists(fromEnv))
         return QFileInfo(fromEnv).absoluteFilePath();
 
-    const QDir appDir(QCoreApplication::applicationDirPath());
-    const QStringList candidates = {
-        QStringLiteral("../../server/app.py"),   // 从 client/build 往上找仓库根
-        QStringLiteral("../server/app.py"),
-        QStringLiteral("server/app.py"),
-    };
-    for (const QString &rel : candidates) {
-        const QString path = QDir::cleanPath(appDir.absoluteFilePath(rel));
-        if (QFileInfo::exists(path))
-            return path;
+    // 从应用目录逐级向上找 server/app.py。
+    // 刻意不写死 "../" 层数：构建产物可能落在 client\build\、client\build\bin\，
+    // 打包后又是另一个层级。写死层数会在换构建布局时静默失效 ——
+    // 表现为"客户端起来了但后端一直连不上"，很难定位。
+    QDir dir(QCoreApplication::applicationDirPath());
+    for (int depth = 0; depth < 6; ++depth) {
+        const QString candidate = dir.absoluteFilePath(QStringLiteral("server/app.py"));
+        if (QFileInfo::exists(candidate)) {
+            const QString resolved = QDir::cleanPath(candidate);
+            qInfo().noquote() << "服务端脚本已定位:" << resolved;
+            return resolved;
+        }
+        if (!dir.cdUp())
+            break;
     }
+
+    qWarning() << "未能在上级目录中找到 server/app.py，起始目录:"
+               << QCoreApplication::applicationDirPath();
     return QString();
 }
 
@@ -133,6 +140,14 @@ void BackendProcess::start()
         emit errorOccurred(tr("服务进程启动失败: %1").arg(m_proc->errorString()));
         return;
     }
+
+    // 把服务进程纳入作业对象：客户端一旦消失（正常退出、崩溃、被任务管理器强杀），
+    // 内核会连带终止它，避免留下占着 GPU 显存和端口的孤儿进程。
+    if (m_job.assignProcess(qint64(m_proc->processId())))
+        emit logMessage(tr("[守护] 服务进程已纳入作业对象，客户端退出时会一并终止"));
+    else
+        emit logMessage(tr("[守护] 警告：作业对象保护未生效，异常退出可能留下孤儿进程"));
+
     emit started();
 }
 

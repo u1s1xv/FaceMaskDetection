@@ -3,6 +3,7 @@
 #include "models/HistoryModel.h"
 #include "models/HistoryProxy.h"
 #include "ImageCanvas.h"
+#include "widgets/PageHeader.h"
 #include "core/BackendClient.h"
 
 #include <QCheckBox>
@@ -37,8 +38,17 @@ HistoryView::HistoryView(BackendClient *client, QWidget *parent)
 
 void HistoryView::buildUi()
 {
-    auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(8, 8, 8, 8);
+    auto *outer = new QVBoxLayout(this);
+    outer->setContentsMargins(12, 12, 12, 12);
+    outer->setSpacing(10);
+
+    outer->addWidget(new PageHeader(
+        tr("历史记录"),
+        tr("每次检测都会自动入库。支持按文件名、时间、ID 搜索，也可以只看存在违规的记录。\n选中一行可在下方查看该次检测的标注结果。")));
+
+    auto *root = new QVBoxLayout;
+    root->setSpacing(8);
+    outer->addLayout(root, 1);
 
     // ---------------- 工具栏 ----------------
     auto *toolbar = new QHBoxLayout;
@@ -80,9 +90,16 @@ void HistoryView::buildUi()
     m_table->setAlternatingRowColors(true);
     m_table->verticalHeader()->setVisible(false);
     m_table->verticalHeader()->setDefaultSectionSize(24);
-    m_table->horizontalHeader()->setStretchLastSection(true);
+    // 列宽策略：文件名吃掉剩余空间，其余按内容收窄。
+    // 文件名用「中间省略」，因为这类名字是 mask_weared_incorrect_<md5>.jpg，
+    // 头尾都有信息量，从右边截会把扩展名也截掉。
+    m_table->setTextElideMode(Qt::ElideMiddle);
+    m_table->horizontalHeader()->setStretchLastSection(false);
+    for (int col = 0; col < HistoryModel::ColumnCount; ++col)
+        m_table->horizontalHeader()->setSectionResizeMode(col, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(HistoryModel::ColFile,
                                                      QHeaderView::Stretch);
+    m_table->horizontalHeader()->setMinimumSectionSize(56);
     m_table->sortByColumn(HistoryModel::ColId, Qt::DescendingOrder);
     splitter->addWidget(m_table);
 
@@ -129,6 +146,22 @@ int HistoryView::loadedRowCount() const
     return m_model->rowCount();
 }
 
+bool HistoryView::detailHasImage() const
+{
+    return m_canvas && m_canvas->hasImage();
+}
+
+int HistoryView::detailDetectionCount() const
+{
+    return m_canvas ? m_canvas->detectionCount() : 0;
+}
+
+void HistoryView::selectFirstRow()
+{
+    if (m_proxy->rowCount() > 0)
+        m_table->selectRow(0);
+}
+
 void HistoryView::applyFilter()
 {
     m_summary->setText(tr("显示 %1 / 共 %2 条")
@@ -163,11 +196,13 @@ void HistoryView::onSelectionChanged()
 {
     const int id = currentRecordId();
     m_deleteButton->setEnabled(id > 0);
+    m_currentDetections.clear();
     if (id <= 0) {
         m_detail->setText(tr("选中一行查看详情"));
         m_canvas->clearAll();
         return;
     }
+    m_detail->setText(tr("正在加载记录 #%1 …").arg(id));
     m_client->fetchRecord(id);
 }
 
@@ -186,7 +221,9 @@ void HistoryView::onRecordReceived(const HistoryRecord &record)
             .arg(record.queueWait * 1000.0, 0, 'f', 0)
             .arg(record.createdAt));
 
-    // 重新拉原图并在客户端画框（复用单图页的 ImageCanvas）
+    // 详情接口才有检测框，必须在这里存下来 —— 列表模型里的 detections 是空的
+    m_currentDetections = record.detections;
+
     m_loadedImageId = record.id;
     m_canvas->clearAll();
     m_client->fetchImage(record.id);
@@ -203,14 +240,11 @@ void HistoryView::onImageReceived(int id, const QByteArray &data)
 
     m_canvas->setImage(image);
 
-    // 用当前选中记录的检测框叠加
-    const QModelIndex proxyIndex = m_table->currentIndex();
-    if (!proxyIndex.isValid())
-        return;
-    const QModelIndex sourceIndex = m_proxy->mapToSource(proxyIndex);
-    const HistoryRecord *record = m_model->recordAt(sourceIndex.row());
-    if (record)
-        m_canvas->setDetections(record->detections);
+    // 叠加详情接口拿到的检测框（此前误用了列表模型，那里是空的）
+    if (!m_currentDetections.isEmpty()) {
+        m_canvas->setDetections(m_currentDetections);
+        m_canvas->fitToWindow();
+    }
 }
 
 void HistoryView::deleteSelected()

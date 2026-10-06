@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
 project(FaceMaskClient VERSION 0.1.0 LANGUAGES CXX)
 
+# 统一产物目录。Visual Studio 生成器是多配置的，默认会放到 build/Release、build/Debug，
+# 路径随配置变化。这里固定成 build/bin，脚本和文档都只认一个路径。
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY              ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG        ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE      ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL   ${CMAKE_BINARY_DIR}/bin)
+
 # ---- C++ 标准 ----
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,6 +35,8 @@ set(FMD_SOURCES
     src/core/SseParser.cpp
     src/core/BackendProcess.h
     src/core/BackendProcess.cpp
+    src/core/ChildProcessJob.h
+    src/core/ChildProcessJob.cpp
     src/views/BackendStatusView.h
     src/views/BackendStatusView.cpp
     src/views/DetectView.h
@@ -51,6 +61,10 @@ set(FMD_SOURCES
     src/views/ImageCanvas.cpp
     src/views/DetectionItem.h
     src/views/DetectionItem.cpp
+    src/widgets/PageHeader.h
+    src/widgets/PageHeader.cpp
+    src/widgets/StatCard.h
+    src/widgets/StatCard.cpp
     src/workers/ImageLoaderTask.h
     src/workers/ImageLoaderTask.cpp
 )

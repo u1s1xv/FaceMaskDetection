@@ -7,6 +7,8 @@
 #include <QProcess>
 #include <QString>
 
+#include "ChildProcessJob.h"
+
 namespace fmd {
 
 class BackendProcess : public QObject
@@ -54,6 +56,9 @@ private:
     void drainChannel(QProcess::ProcessChannel channel);
 
     QProcess *m_proc = nullptr;
+
+    // 保证子进程不会在客户端异常退出后变成孤儿（见 ChildProcessJob 注释）
+    ChildProcessJob m_job;
     QString   m_python;
     QString   m_script;
     quint16   m_port = 8756;
