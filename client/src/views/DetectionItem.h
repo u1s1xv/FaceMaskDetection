@@ -35,7 +35,6 @@ private:
     QRectF    m_labelRect; // 标签底衬
     QString   m_label;
     bool      m_hovered = false;
-    qreal     m_scale = 1.0;
 };
 
 } // namespace fmd

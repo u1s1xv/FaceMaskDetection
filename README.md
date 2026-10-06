@@ -146,24 +146,141 @@ deploy.bat           REM 产物在 dist\，可直接拷到其它机器运行
 
 ```
 FaceMaskDetection/
-├── client/                 C++/Qt5 上位机客户端
-│   ├── src/
-│   │   ├── core/           与界面无关的基础设施
-│   │   │   ├── Protocol.*        数据契约（JSON 解析集中于此）
-│   │   │   ├── BackendClient.*   异步网络层
-│   │   │   ├── BackendProcess.*  QProcess 守护
-│   │   │   ├── ChildProcessJob.* 作业对象（防孤儿进程）
-│   │   │   └── SseParser.*       SSE 增量解析
-│   │   ├── models/         QAbstractTableModel + 代理
-│   │   ├── workers/        QRunnable 与批量调度器
-│   │   ├── views/          五个页面 + 自绘图元
-│   │   └── widgets/        PageHeader / StatCard
-│   ├── resources/          QSS 主题 + 图标 + i18n
-│   └── tests/              Qt Test 单元测试
-├── server/                 Python 推理服务（标准库）
-├── yoloserver/             模型权重、训练/转换脚本（命令行工具）
-└── docs/                   架构说明、性能数据、界面截图
+├── client/                     【产品】C++17 / Qt5 上位机客户端
+├── server/                     【产品】Python 推理服务（仅标准库）
+├── yoloserver/                 【资产】模型权重与训练/转换工具链
+├── crawler_script/             【工具】数据集爬取
+├── docs/                       【文档】架构、性能、计划、截图
+└── data/                       【运行期】历史库与原图（已 gitignore）
 ```
+
+### client/ —— Qt 客户端
+
+界面、渲染、任务调度都在这里。**唯一与用户交互的部分。**
+
+```
+client/
+├── src/
+│   ├── core/                   与界面无关的基础设施（可单独测试）
+│   │   ├── Protocol.*          数据契约：所有 JSON 解析集中于此，界面层不碰 QJsonObject
+│   │   ├── BackendClient.*     异步网络层：全部请求非阻塞，结果通过信号回传
+│   │   ├── BackendProcess.*    QProcess 守护：拉起服务、崩溃自动重启、日志转发
+│   │   ├── ChildProcessJob.*   Windows 作业对象：客户端被强杀时后端不会变孤儿
+│   │   ├── SseParser.*         SSE 增量解析（大模型流式输出）
+│   │   └── MjpegParser.*       MJPEG 增量解析（实时画面）
+│   ├── models/                 历史表格的数据层
+│   │   ├── HistoryModel.*      QAbstractTableModel：数据与视图解耦
+│   │   └── HistoryProxy.*      QSortFilterProxyModel：关键词与"只看违规"筛选
+│   ├── workers/                后台任务
+│   │   ├── ImageLoaderTask.*   QRunnable：大图解码不阻塞界面
+│   │   └── BatchController.*   批量调度：两级背压（预读上限 + 在途请求上限）
+│   ├── views/                  六个页面与自绘图元
+│   │   ├── DetectView.*        单图检测
+│   │   ├── LiveView.*          实时监控（摄像头 / RTSP / 视频文件）
+│   │   ├── BatchView.*         批量检测（含逐行结果预览）
+│   │   ├── HistoryView.*       历史记录（含标注结果回看）
+│   │   ├── ModelsView.*        模型管理
+│   │   ├── SettingsView.*      设置（含后端诊断面板）
+│   │   ├── ImageCanvas.*       QGraphicsView 画布：缩放、平移、悬停
+│   │   ├── DetectionItem.*     自定义 QGraphicsItem：一个图元画框+标签+文字
+│   │   ├── VideoWidget.*       实时画面显示（只画最新一帧，不做交互）
+│   │   └── LlmAnalysisDialog.* AI 分析结果展示
+│   ├── widgets/                可复用的小组件
+│   │   ├── PageHeader.*        页面标题 + 说明，给界面建立层次
+│   │   └── StatCard.*          统计数字卡片（大号数字 + 语义色条）
+│   └── main.cpp                入口 + 全部无界面验证模式（--selftest / --smoke-* 等）
+├── resources/
+│   ├── style.qss               主题样式表（编译进可执行文件）
+│   ├── resources.qrc           Qt 资源清单
+│   └── i18n/                   中英翻译（Qt Linguist 的 .ts）
+├── tests/                      Qt Test 单元测试（SseParser / MjpegParser，31 项）
+├── CMakeLists.txt              构建定义（含 windeployqt 部署 Qt 运行时）
+├── build.bat                   一键构建：vcvars64 → CMake → MSBuild → 部署
+├── deploy.bat                  打包到 dist/，并校验 Qt DLL 来源
+└── README.md                   客户端的详细说明与故障排查
+```
+
+### server/ —— Python 推理服务
+
+刻意保持"薄"：只做推理与数据，不做界面。约 3000 行，**零第三方依赖**
+（`http.server` + `sqlite3` + `cv2`，`requests` 仅在大模型对接时需要）。
+
+```
+server/
+├── app.py                      HTTP 路由与服务入口（唯一的对外接口层）
+├── detector.py                 YOLO 推理内核：模型加载/缓存、单张与批量推理
+├── batching.py                 推理微批处理：把并发请求聚成一批摊薄框架开销
+├── camera.py                   视频源抽象：采集线程、latest-frame-wins、断流重连
+├── live.py                     实时管线：采集 → 推理 → 画框 → JPEG
+├── storage.py                  持久化：SQLite 历史库、原图后台写盘、保留策略
+├── llm.py                      大模型分析客户端（无 API key 时走 mock 模式）
+└── tools/                      独立小工具（不参与服务运行）
+    ├── make_test_video.py      从已爬图片合成测试视频（虚拟摄像头源）
+    ├── test_camera.py          视频源模块验证（15 项断言）
+    └── preview.py              浏览器实时预览（验证用，不是产品形态）
+```
+
+### yoloserver/ —— 模型资产与工具链
+
+本项目**不涉及训练**。这里的模型来自早先的协作项目，定位是
+"让训练好的模型在工业现场跑得稳"。
+
+```
+yoloserver/
+├── models/
+│   ├── checkpoints/            训练好的权重（服务端默认从这里加载）
+│   └── pretrained/             YOLO 官方预训练权重（转换/对比用）
+├── scripts/                    训练、验证、格式转换等命令行工具
+├── utils/                      工具脚本依赖的辅助模块
+├── configs/                    数据集与训练配置
+├── data/                       数据集（crawled/ 为已爬取的图片）
+└── initialize_project.py       初始化目录骨架
+```
+
+> **换模型**：把新的 `.pt` 放进 `models/checkpoints/`，在「模型管理」页点「重新扫描」即可。
+> 这套架构的价值不在"口罩检测"这个具体任务，而在**可替换模型的工业视觉上位机框架**。
+
+### crawler_script/ —— 数据集爬取
+
+独立于产品的一次性工具，用于收集训练图片。
+有单独的 `requirements.txt` —— 它需要的第三方库**不属于服务端依赖**。
+
+### docs/ —— 文档
+
+```
+docs/
+├── ARCHITECTURE.md             设计决策与理由（含踩过的坑与取舍）
+├── BENCHMARK.md                全部实测数据（渲染方案、并发、后端优化）
+├── ROADMAP.md                  阶段计划与已完成情况
+├── TODO.md                     已知问题与后续方向  ← 想接着做就看这个
+├── REFACTOR_PLAN.md            从 Django Web 版改造为桌面端的完整记录
+├── screenshots/                界面截图（README 中引用）
+└── legacy/                     原协作项目的分工文档（来源凭据，不是产品内容）
+```
+
+### data/ —— 运行期数据（不入库）
+
+```
+data/
+├── history.db                  SQLite 历史库（检测记录）
+├── uploads/YYYY/MM/DD/         每次检测的原图，按保留策略自动清理
+├── server.log                  服务端日志（客户端异常退出时唯一能留下的线索）
+└── test_video/                 合成的测试视频（用 tools/make_test_video.py 生成）
+```
+
+整个目录已在 `.gitignore` 中。原图默认保留 30 天 / 上限 2 GB，
+可用 `FMD_UPLOAD_RETENTION_DAYS` 与 `FMD_UPLOAD_MAX_MB` 调整。
+
+### 想快速了解这个项目？
+
+| 你的目的 | 看哪里 |
+| --- | --- |
+| 跑起来看看 | 上面的「快速开始」 |
+| 了解设计取舍 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| 看实测数据 | [docs/BENCHMARK.md](docs/BENCHMARK.md) |
+| 接着往下做 | [docs/TODO.md](docs/TODO.md) |
+| 读客户端代码 | 从 `client/src/core/Protocol.h` 开始 —— 它定义了前后端的数据契约 |
+| 读服务端代码 | 从 `server/app.py` 的路由表开始，每个模块都有中文头注释说明职责 |
 
 ---
 
