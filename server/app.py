@@ -25,8 +25,10 @@ import numpy as np
 
 from detector import get_detector, MODELS_DIR
 from llm import stream_analysis, api_key_configured, AVAILABLE_MODELS, DEFAULT_MODEL
+from batching import get_batcher
+import batching
 from camera import get_manager
-from storage import (get_store, DB_PATH, UPLOAD_DIR, DATA_DIR,
+from storage import (get_store, get_writer, DB_PATH, UPLOAD_DIR, DATA_DIR,
                      UPLOAD_RETENTION_DAYS, UPLOAD_MAX_MB)
 
 # 除了 stderr，同时写一份到 data/server.log。
@@ -120,7 +122,11 @@ class Handler(BaseHTTPRequestHandler):
                                         "default": DEFAULT_MODEL,
                                         "api_key_configured": api_key_configured()})
             if segs == ["stats"]:
-                return self._send_json({"success": True, "stats": get_store().stats()})
+                return self._send_json({
+                    "success": True,
+                    "stats": get_store().stats(),
+                    "inference": get_batcher().stats(),
+                })
             if segs == ["history"]:
                 data = get_store().list_records(
                     limit=int(self._one(query, "limit", 200)),
@@ -179,6 +185,10 @@ class Handler(BaseHTTPRequestHandler):
     def _serve_image(self, record_id):
         """按记录 id 返回原始上传图，供历史详情展示。"""
         record = get_store().get_record(record_id)
+        # 原图是后台线程写的，刚检测完立刻点历史可能还没落盘。
+        # 这里等一小会儿 —— 否则会偶发"记录存在但图 404"。
+        if record is not None:
+            get_store().wait_image_ready(record.get("image_path"), timeout=2.0)
         if record is None:
             return self._send_json({"success": False, "error": "记录不存在"}, 404)
 
@@ -384,14 +394,28 @@ class Handler(BaseHTTPRequestHandler):
         logger.info("推理请求: %dx%d, model=%s, conf=%s, iou=%s, imgsz=%s",
                     image.shape[1], image.shape[0], model_name, confidence, iou, imgsz)
 
-        result = get_detector().run_inference(
-            image_data=image,
-            model_name=model_name,
-            confidence=confidence,
-            iou=iou,
-            imgsz=imgsz,
-            annotated=want_image,
-        )
+        if want_image:
+            # 服务端渲染标注图那条路径不进批处理：它要生成 PNG（本来就慢 3 倍），
+            # 而且只在"对比两种渲染方式"时用，不是常态路径。
+            result = get_detector().run_inference(
+                image_data=image, model_name=model_name,
+                confidence=confidence, iou=iou, imgsz=imgsz, annotated=True,
+            )
+        elif batching.ENABLED:
+            batcher = get_batcher()
+            t_wait = time.time()
+            result = batcher.submit(image, {
+                "model_name": model_name or None,
+                "confidence": confidence,
+                "iou": iou,
+                "imgsz": imgsz,
+            })
+            result["queue_wait"] = time.time() - t_wait
+        else:
+            result = get_detector().run_inference(
+                image_data=image, model_name=model_name,
+                confidence=confidence, iou=iou, imgsz=imgsz, annotated=False,
+            )
 
         payload = {"success": True}
         payload.update({k: v for k, v in result.items() if k != "beautified_image_data"})
@@ -521,6 +545,11 @@ def main():
             logger.warning("原图清理失败（已忽略）: %s", exc)
 
     threading.Thread(target=_cleanup_worker, name="upload-cleanup", daemon=True).start()
+
+    # 启动推理批处理线程。模型仍按需加载（首次推理时才载入），
+    # 这里只是把"聚批"的调度器准备好。
+    get_batcher().start()
+    get_writer().start()      # 原图后台写盘线程
 
     try:
         server.serve_forever()
