@@ -119,7 +119,8 @@ class Detector:
 
     # ------------------------------------------------------------ 推理
     def run_inference(self, image_path=None, image_data=None, model_name=None,
-                      confidence=0.25, iou=0.45, imgsz=640, annotated=True):
+                      confidence=0.25, iou=0.45, imgsz=640, annotated=True,
+                      quiet=False):
         """执行一次推理。
 
         Args:
@@ -127,6 +128,7 @@ class Detector:
             image_data: 内存图像（numpy 数组或 PIL Image）
             model_name: 权重文件名；留空则自动挑 *_best.pt
             annotated:  是否生成标注图（批量时可关掉省时间）
+            quiet:      不写日志。实时路径每帧都调，默认日志会刷屏（30fps 下 30 行/秒）
 
         Returns:
             dict: 结构化结果
@@ -162,8 +164,9 @@ class Detector:
 
         result["queue_wait"] = queue_wait
         result["total_time"] = time.time() - start_time
-        logger.info("推理完成: 排队 %.0f ms, 推理 %.0f ms",
-                    queue_wait * 1000, result["processing_time"] * 1000)
+        if not quiet:
+            logger.info("推理完成: 排队 %.0f ms, 推理 %.0f ms",
+                        queue_wait * 1000, result["processing_time"] * 1000)
         return result
 
     # ------------------------------------------------------------ 结果处理

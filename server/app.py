@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -105,12 +106,18 @@ class Handler(BaseHTTPRequestHandler):
                     "devices": get_manager().list_devices_cached(),
                     "opened": get_manager().list_opened(),
                 })
+            if len(segs) == 3 and segs[0] == "cameras" and segs[2] == "stream.mjpg":
+                return self._stream_mjpeg(segs[1])
             if len(segs) == 3 and segs[0] == "cameras" and segs[2] == "stats":
                 src = get_manager().get(segs[1])
+                pipeline = get_manager().get_pipeline(segs[1])
                 if src is None:
                     return self._send_json(
                         {"success": False, "error": "视频源不存在: " + segs[1]}, 404)
-                return self._send_json({"success": True, "stats": src.stats()})
+                payload = {"success": True, "stats": src.stats()}
+                if pipeline is not None:
+                    payload["live"] = pipeline.stats()
+                return self._send_json(payload)
             if len(segs) == 2 and segs[0] == "image":
                 return self._serve_image(segs[1])
             if len(segs) == 2 and segs[0] == "history":
@@ -192,6 +199,85 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             logger.exception("POST %s 失败", parsed.path)
             return self._send_json({"success": False, "error": str(exc)}, 500)
+
+    def _stream_mjpeg(self, cam_id, target_fps=25.0, idle_timeout=10.0):
+        """MJPEG 推流：multipart/x-mixed-replace。
+
+        为什么用 MJPEG 而不是 WebSocket/分片：
+          - 浏览器原生支持 multipart/x-mixed-replace，不需要任何前端代码
+          - 每一帧都是独立 JPEG，客户端无需处理帧边界与解码状态
+          - 单帧 25 KB，25fps 只有 0.6 MB/s，本机回环完全无压力
+        代价是没有音频、没有 B 帧压缩 —— 对监控画面无所谓。
+
+        注意：这是一个长连接，会占住一个 HTTP 线程。
+        ThreadingHTTPServer 每个连接一个线程，所以几路监控没问题，
+        但不要拿它当公网流媒体服务。
+        """
+        pipeline = get_manager().get_pipeline(cam_id)
+        if pipeline is None:
+            return self._send_json(
+                {"success": False, "error": "视频源不存在或未启动: " + cam_id}, 404)
+
+        boundary = "fmd_frame"
+        self.send_response(200)
+        self.send_header("Content-Type",
+                         "multipart/x-mixed-replace; boundary=%s" % boundary)
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+        interval = 1.0 / target_fps if target_fps > 0 else 0.0
+        last_seq = -1
+        last_sent = 0.0
+        idle_since = time.time()
+        sent = 0
+
+        try:
+            while True:
+                seq, payload, _ = pipeline.peek_frame()
+                now = time.time()
+
+                if payload is None:
+                    # 管线还没产出任何帧。做空闲超时，
+                    # 避免客户端异常断开后线程永远挂在这里。
+                    if now - idle_since > idle_timeout:
+                        logger.warning("推流 %s 空闲超时（管线无输出），结束连接", cam_id)
+                        break
+                    time.sleep(0.004)
+                    continue
+
+                # 只有"新帧"才发。同一帧重复发没有意义，也浪费带宽。
+                # 注意这里的判断顺序：必须先用旧值比较，再更新 last_seq。
+                # （初版写成了先赋值再比较，条件恒为真，导致一帧都发不出去。）
+                if seq == last_seq:
+                    time.sleep(0.004)
+                    continue
+
+                # 限速：管线可能比目标帧率快
+                if interval > 0 and (now - last_sent) < interval:
+                    time.sleep(0.004)
+                    continue
+
+                jpeg = payload["jpeg"]
+                self.wfile.write(b"--" + boundary.encode() + b"\r\n")
+                self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                self.wfile.write(("Content-Length: %d\r\n\r\n" % len(jpeg)).encode())
+                self.wfile.write(jpeg)
+                self.wfile.write(b"\r\n")
+
+                last_seq = seq
+                last_sent = now
+                idle_since = now
+                sent += 1
+
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError,
+                OSError) as exc:
+            # 客户端关掉页面/断开连接是常态，不是错误
+            logger.info("推流 %s 结束（客户端断开: %s），已发送 %d 帧",
+                        cam_id, type(exc).__name__, sent)
+        except Exception:                              # noqa: BLE001
+            logger.exception("推流 %s 异常", cam_id)
 
     def _camera_open(self):
         """打开一个视频源。

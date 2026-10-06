@@ -122,7 +122,35 @@ MSMF/DSHOW 是摄像头专用后端，文件与网络流必须交给 FFMPEG。�
   - `POST /cameras/{id}/open` / `close`
 - **验证**：连开 10 分钟不断流，帧率稳定在 30 FPS 附近
 
-### 阶段 2：实时推理与推流（核心）⬅ 下一步
+### 阶段 2：实时推理与推流（核心）🚧 服务端已完成，客户端页面待做
+
+**已完成**：[`server/live.py`](../server/live.py)（`LivePipeline`）+
+`GET /cameras/{id}/stream.mjpg`（MJPEG）+ [`server/tools/preview.py`](../server/tools/preview.py)（浏览器预览）
+
+**实测**（真实 USB 摄像头，640×480）：采集 30.0 FPS · 推理 ~20 ms · 端到端 ~50 ms
+· JPEG 28 KB/帧 · 推流 23 FPS（受 25fps 限速）
+
+**待做**：Qt 客户端「实时监控」页（解析 `multipart/x-mixed-replace`）
+
+#### 实现中踩到的三个坑
+
+**1. 推流发送循环的判断顺序写反了。** 初版写成：
+
+```python
+if seq != last_seq:
+    last_seq = seq          # 先赋值
+if seq == last_seq and ...  # 再和自己比 —— 恒为真
+```
+
+结果每轮都 `continue`，**一帧都发不出去**。而且表面上连接是成功的
+（HTTP 200、Content-Type 正确），极具迷惑性。正确写法是先用旧值比较、再更新。
+
+**2. 日志刷屏。** `run_inference` 每次写一行日志，实时路径 30fps 就是 30 行/秒。
+加了 `quiet` 参数。
+
+**3. 缺 `import time`。** 推流函数在 `try` 之前用了 `time.time()`，异常直接冒到外层，
+表现为"连接建立后立刻 500"。教训：`py_compile` 抓不到这类问题，
+应该把整个 server 目录的模块都 import 一遍做静态检查。
 
 - 推理线程：取最新帧 → 推理（`annotated=False`）→ cv2 画框（含中文类别名映射）→ JPEG 编码
 - **MJPEG 端点** `GET /cameras/{id}/stream.mjpg`（`multipart/x-mixed-replace`）

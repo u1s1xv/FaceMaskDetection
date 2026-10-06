@@ -393,6 +393,7 @@ class CameraManager:
 
     def __init__(self):
         self._sources = {}                 # cam_id -> CameraSource
+        self._pipelines = {}               # cam_id -> LivePipeline
         self._lock = threading.Lock()
         self._counter = 0
         self._devices_cache = None
@@ -419,15 +420,25 @@ class CameraManager:
             src.stop()
             raise RuntimeError("视频源 %s 打开后 5 秒内没有出帧" % source)
 
+        # 延迟导入：live.py 需要 camera.FrameSlot，模块顶层互相 import 会成环。
+        # 这里只在真正打开摄像头时才导入，循环在加载期不会发生。
+        from live import LivePipeline
+        pipeline = LivePipeline(src)
+        pipeline.start()
+
         with self._lock:
             self._sources[cam_id] = src
+            self._pipelines[cam_id] = pipeline
         return cam_id, src
 
     def close(self, cam_id):
         with self._lock:
             src = self._sources.pop(cam_id, None)
+            pipeline = self._pipelines.pop(cam_id, None)
         if src is None:
             return False
+        if pipeline is not None:
+            pipeline.stop()          # 先停推理，再停采集
         src.stop()
         return True
 
@@ -435,10 +446,22 @@ class CameraManager:
         with self._lock:
             return self._sources.get(cam_id)
 
+    def get_pipeline(self, cam_id):
+        with self._lock:
+            return self._pipelines.get(cam_id)
+
     def list_opened(self):
         with self._lock:
             items = list(self._sources.items())
-        return [dict(cam_id=cid, **src.stats()) for cid, src in items]
+            pipes = dict(self._pipelines)
+        out = []
+        for cid, src in items:
+            entry = dict(cam_id=cid, **src.stats())
+            pipe = pipes.get(cid)
+            if pipe is not None:
+                entry["live"] = pipe.stats()
+            out.append(entry)
+        return out
 
     def list_devices_cached(self, ttl=30.0):
         """枚举本机摄像头，结果缓存若干秒。
@@ -459,7 +482,11 @@ class CameraManager:
     def close_all(self):
         with self._lock:
             items = list(self._sources.items())
+            pipes = list(self._pipelines.values())
             self._sources.clear()
+            self._pipelines.clear()
+        for pipe in pipes:
+            pipe.stop()
         for _, src in items:
             src.stop()
         return len(items)
